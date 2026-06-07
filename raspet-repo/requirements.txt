@@ -1,0 +1,27 @@
+# RasPet 의존성 목록
+# 설치:  pip install -r requirements.txt
+#
+# ※ Raspberry Pi 5 / Raspberry Pi OS (64-bit) 기준입니다.
+#   일부 패키지는 pip보다 apt 설치가 안정적이며, 아래 주석을 참고하세요.
+
+# ── 게임 엔진 / 그래픽 ───────────────────────────────
+pygame>=2.5
+Pillow>=10.0
+
+# ── 디스플레이 (OLED) ────────────────────────────────
+luma.oled>=3.12
+
+# ── 컴퓨터 비전 ──────────────────────────────────────
+opencv-python>=4.8
+numpy>=1.24
+mediapipe>=0.10          # ⚠ aarch64에서 설치 제약 가능. 실패 시 OpenCV 윤곽선 방식으로 대체
+# picamera2             # ⚠ pip 대신 apt 권장:  sudo apt install -y python3-picamera2
+
+# ── 하드웨어 제어 (GPIO / SPI) ───────────────────────
+gpiozero>=2.0           # MCP3008 ADC, HC-SR04, 부저 등 지원
+lgpio>=0.2              # Raspberry Pi 5 권장 GPIO 백엔드
+spidev>=3.6             # MCP3008 SPI 통신
+
+# ── 데이터 저장 ──────────────────────────────────────
+# SQLite는 Python 표준 라이브러리(sqlite3)에 포함되어 별도 설치가 필요 없습니다.
+# JSON 방식 사용 시에도 추가 패키지가 필요 없습니다.
