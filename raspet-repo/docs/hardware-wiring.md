@@ -2,6 +2,8 @@
 
 라즈베리파이 5 기준. 핀 번호는 모두 **BCM(GPIO) 번호**이며, 값은 [`src/raspet/config.py`](../src/raspet/config.py)에서 가져온 것입니다. 배선을 바꾸면 **코드가 아니라 `config.py`만** 수정하세요.
 
+> 🗺️ **40핀 헤더에 모듈을 그림으로 매핑한 다이어그램**과 부품 목록(BOM)·Fritzing 부품 목록은 [`wiring-diagram.md`](wiring-diagram.md)를 참고하세요.
+
 > ⚠️ Pi 5는 `RPi.GPIO`가 동작하지 않습니다. 본 프로젝트는 `gpiozero` + `lgpio` 백엔드를 사용합니다.
 
 ---
