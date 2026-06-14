@@ -119,8 +119,7 @@ raspet/
 │   ├── 임베디드_프로젝트_계획서_RasPet.docx
 │   ├── project-plan.md      #  계획서 (웹에서 바로 읽을 수 있는 마크다운 버전)
 │   ├── roadmap.md           #  개발 단계·마일스톤
-│   ├── hardware-wiring.md   #  배선 가이드 (핀맵·분압·인터페이스 활성화)
-│   └── github-actions-ci.yml#  CI 워크플로 (활성화 시 .github/workflows/로 복사)
+│   └── hardware-wiring.md   #  배선 가이드 (핀맵·분압·인터페이스 활성화)
 ├── src/raspet/
 │   ├── config.py            # 전역 설정 (해상도, 핀맵, 밸런스, 이벤트·업적·엔딩)
 │   ├── app.py               # 애플리케이션 부트스트랩
@@ -137,8 +136,7 @@ raspet/
 └── tests/                   # 테스트 (63케이스)
 ```
 
-> 🔧 **CI 활성화:** 테스트 자동 실행 워크플로는 [`docs/github-actions-ci.yml`](docs/github-actions-ci.yml)에 있습니다.
-> 이 파일을 저장소 루트의 `.github/workflows/ci.yml`로 추가하면(웹 UI 또는 `workflow` 권한 토큰) push마다 pytest가 돌고 위 CI 배지가 채워집니다.
+> 🔧 **CI:** 저장소 루트의 `.github/workflows/ci.yml`이 push/PR마다 헤드리스로 `pytest`를 자동 실행합니다. 결과는 위쪽 CI 배지에서 확인할 수 있습니다.
 
 ---
 
