@@ -63,6 +63,7 @@ def test_trap_penalty_and_combo_reset():
 def test_miss_on_mole_expire():
     e = WhackEngine()
     e.combo = 2
+    e._spawn_cd = 10.0                       # 이번 update에서 새 두더지 재등장 차단(만료만 검증)
     e.moles[2] = _mole(ttl=0.5)
     e.update(0.6)                            # 수명 초과 → 놓침
     assert 2 not in e.moles
@@ -72,6 +73,7 @@ def test_miss_on_mole_expire():
 def test_trap_expire_is_safe():
     e = WhackEngine()
     e.coins = 5
+    e._spawn_cd = 10.0                       # 재등장 차단
     e.moles[1] = _trap(ttl=0.5)
     e.update(0.6)                            # 함정은 그냥 사라지면 무사
     assert 1 not in e.moles

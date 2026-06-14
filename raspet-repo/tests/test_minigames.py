@@ -88,6 +88,27 @@ def test_jump_clears_when_high():
     assert e.alive is True
 
 
+def test_ultrasonic_dummy_returns_far_distance():
+    from raspet.hardware.ultrasonic import DummyUltrasonic
+    u = DummyUltrasonic()
+    assert u.available is False
+    assert u.distance_cm() == float(config.JUMP_DISTANCE_MAX_CM)
+
+
+def test_ultrasonic_read_never_blocks_game_on_error():
+    """센서를 안 꽂아 읽기가 실패해도 게임 루프가 멈추지 않고 안전값으로 폴백한다."""
+    from raspet.hardware.ultrasonic import Ultrasonic
+
+    class _Boom:
+        @property
+        def distance(self):
+            raise RuntimeError("에코 없음")
+
+    u = Ultrasonic.__new__(Ultrasonic)   # __init__(실하드웨어) 우회
+    u._sensor = _Boom()
+    assert u.distance_cm() == float(config.JUMP_DISTANCE_MAX_CM)
+
+
 # ── 색깔 찾기 ────────────────────────────────────────────
 @pytest.mark.skipif(not _CV_AVAILABLE, reason="OpenCV 미설치")
 def test_color_match_red():
