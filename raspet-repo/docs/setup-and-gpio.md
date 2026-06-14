@@ -237,5 +237,7 @@ sudo systemctl enable --now raspet.service
 | 조이스틱 값이 안 변함 | `ls /dev/spidev*`, MCP3008 배선/VREF, SPI 활성화 |
 | 초음파 거리 이상/항상 같음 | TRIG/ECHO 배선, **ECHO 분압**, VCC 5V 확인 |
 | GPIO 에러(Pi 5) | `export GPIOZERO_PIN_FACTORY=lgpio`, `python3-lgpio` 설치 |
+| `mediapipe` 설치 실패 | 정상입니다(aarch64 미지원). 무시하면 OpenCV로 자동 폴백됩니다. |
+| `import cv2` → `libGL.so.1` 없음 | `sudo apt install -y libgl1`, 또는 `pip install opencv-python-headless` |
 | 손 인식 안 됨 | 조명 밝게, MediaPipe 미설치 시 OpenCV 폴백(정확도↓) |
 | 하드웨어 없이 그냥 돌리고 싶음 | `RASPET_DUMMY=1 python main.py` |

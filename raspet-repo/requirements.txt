@@ -12,9 +12,11 @@ Pillow>=10.0
 luma.oled>=3.12
 
 # ── 컴퓨터 비전 ──────────────────────────────────────
-opencv-python>=4.8
+opencv-python>=4.8       # 손 인식 폴백 + 색깔 찾기. 가벼운 opencv-python-headless도 가능
 numpy>=1.24
-mediapipe>=0.10          # ⚠ aarch64에서 설치 제약 가능. 실패 시 OpenCV 윤곽선 방식으로 대체
+# mediapipe>=0.10        # (선택) aarch64/라즈베리파이는 pip 설치가 안 되는 경우가 흔하다.
+#                          미설치 시 자동으로 OpenCV 윤곽선 방식으로 폴백하므로 게임 동작에는
+#                          지장이 없다. 설치를 원하면 따로 시도:  pip install mediapipe
 # picamera2             # ⚠ pip 대신 apt 권장:  sudo apt install -y python3-picamera2
 
 # ── 하드웨어 제어 (GPIO / SPI) ───────────────────────
