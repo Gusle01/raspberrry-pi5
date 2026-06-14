@@ -130,6 +130,13 @@ class GameContext:
     def rect(self, x, y, w, h, color, fill=True) -> None:
         pygame.draw.rect(self.surface, color, (x, y, w, h), 0 if fill else 1)
 
+    def circle(self, x, y, r, color, fill=True) -> None:
+        pygame.draw.circle(self.surface, color, (int(x), int(y)), int(r),
+                           0 if fill else 1)
+
+    def line(self, x1, y1, x2, y2, color, width=1) -> None:
+        pygame.draw.line(self.surface, color, (x1, y1), (x2, y2), width)
+
     def present(self) -> None:
         """그린 프레임을 창과 OLED로 내보낸다."""
         if self.window is not None:

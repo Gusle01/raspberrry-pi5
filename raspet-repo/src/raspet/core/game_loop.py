@@ -3,10 +3,11 @@
 입력 처리 → 상태 갱신 → 렌더 → 출력(창/OLED) → FPS 제한을 반복한다.
 씬 전환은 SceneManager가, 입출력/하드웨어는 GameContext가 담당한다.
 """
+import random
 import time
 
 from .scene import SceneManager
-from .scenes import MenuScene
+from .scenes import TitleScene
 from ..shop.shop import Shop
 from ..character import needs
 from ..storage import save
@@ -21,13 +22,14 @@ class GameLoop:
         self.character = character
         self.shop = Shop()
         self.scenes = SceneManager()
+        self.rng = random.Random()         # 랜덤 이벤트용
         self.running = True
 
         # 마지막 플레이 이후 경과 시간만큼 돌봄 상태 감소 (다마고치 요소)
         if last_saved_ts is not None:
             needs.apply_time_decay(character, last_saved_ts, time.time())
 
-        self.scenes.switch_to(MenuScene())
+        self.scenes.switch_to(TitleScene())
 
     def switch(self, scene) -> None:
         self.scenes.switch_to(scene)

@@ -36,6 +36,10 @@ class Character:
     currency: int = 0       # 재화
     inventory: list = field(default_factory=list)
     stage: int = 0          # 성장 단계(진화)
+    # 통계/도전 과제
+    games_played: int = 0           # 미니게임 플레이 횟수
+    total_earned: int = 0           # 누적 획득 재화
+    achievements: list = field(default_factory=list)  # 달성한 업적 id 목록
 
     def grow(self, stat: str, amount: int) -> int:
         """능력치를 올린다 (상한·스트레스 효율 적용). 실제 증가량을 반환한다.

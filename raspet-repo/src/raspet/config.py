@@ -135,6 +135,70 @@ ENDINGS = [
      "desc": "특출나진 않지만 평온하고 행복한 삶을 살았다."},
 ]
 
+# ── 감정(무드) 임계값 ────────────────────────────────
+# compute_mood가 위에서부터 검사한다(앞쪽이 우선순위 높음).
+MOOD_HEALTH_SICK = 25       # 체력 이하 → 아픔
+MOOD_FULLNESS_HUNGRY = 20   # 포만 이하 → 배고픔
+MOOD_CLEAN_DIRTY = 20       # 청결 이하 → 더러움
+MOOD_STRESS_HIGH = 70       # 스트레스 이상 → 짜증
+MOOD_HAPPY = 70             # 행복 이상 → 기쁨
+MOOD_SAD = 30               # 행복 이하 → 슬픔
+
+# 성장 단계별 몸 색 (stage 0~3)
+STAGE_COLORS = [
+    (230, 220, 180),   # 0: 알
+    (150, 210, 230),   # 1: 아기
+    (120, 200, 150),   # 2: 어린이
+    (200, 170, 230),   # 3: 어른
+]
+
+# ── 시간대 (시간대 반영) ─────────────────────────────
+# (시작시각, 종료시각) 반열린구간 [start, end). 나머지는 'night'.
+DAYTIME_BOUNDS = {"morning": (6, 11), "day": (11, 18), "evening": (18, 21)}
+DAYTIME_TINT = {
+    "morning": (30, 28, 40),
+    "day": (12, 18, 34),
+    "evening": (38, 22, 30),
+    "night": (6, 8, 18),
+}
+
+# ── 랜덤 이벤트 ──────────────────────────────────────
+EVENT_CHANCE = 0.35         # 미니게임 후 이벤트가 발생할 확률
+# weight: 가중치(클수록 자주). effect: 캐릭터에 적용할 변화.
+EVENTS = [
+    {"id": "found_coin", "title": "행운", "weight": 3,
+     "desc": "길에서 동전을 주웠다!", "effect": {"currency": 10}},
+    {"id": "nice_weather", "title": "맑은 날", "weight": 3,
+     "desc": "기분 좋은 바람이 분다.", "effect": {"happiness": 8, "stress": -5}},
+    {"id": "good_dream", "title": "좋은 꿈", "weight": 2,
+     "desc": "개운하게 일어났다.", "effect": {"stress": -10}},
+    {"id": "caught_cold", "title": "감기", "weight": 2,
+     "desc": "으슬으슬 감기에 걸렸다...", "effect": {"health": -10, "happiness": -5}},
+    {"id": "spark", "title": "영감", "weight": 1,
+     "desc": "문득 깨달음을 얻었다!", "effect": {"intellect": 5}},
+    {"id": "workout", "title": "의욕", "weight": 1,
+     "desc": "운동이 잘 됐다!", "effect": {"strength": 5}},
+    {"id": "fan_letter", "title": "팬레터", "weight": 1,
+     "desc": "누군가 편지를 보내왔다.", "effect": {"charm": 4, "happiness": 5}},
+]
+
+# ── 도전 과제(업적) ──────────────────────────────────
+# requires: 캐릭터 속성(또는 'stat_total')이 값 이상이면 달성.
+ACHIEVEMENTS = [
+    {"id": "first_game", "title": "첫 걸음", "desc": "미니게임을 처음 즐겼다.",
+     "requires": {"games_played": 1}},
+    {"id": "evolved", "title": "성장", "desc": "처음으로 진화했다.",
+     "requires": {"stage": 1}},
+    {"id": "rich", "title": "부자", "desc": "재화를 200 모았다.",
+     "requires": {"currency": 200}},
+    {"id": "scholar_path", "title": "수재", "desc": "지력 80을 달성했다.",
+     "requires": {"intellect": 80}},
+    {"id": "all_rounder", "title": "팔방미인", "desc": "핵심 능력치 합 200.",
+     "requires": {"stat_total": 200}},
+    {"id": "veteran", "title": "베테랑", "desc": "미니게임을 20판 했다.",
+     "requires": {"games_played": 20}},
+]
+
 # ── 저장 ─────────────────────────────────────────────
 SAVE_BACKEND = "json"       # "json" 또는 "sqlite"
 SAVE_PATH = "data/savegame.json"

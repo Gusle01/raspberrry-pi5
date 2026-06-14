@@ -1,0 +1,44 @@
+# GitHub Actions CI 워크플로 (참고용)
+#
+# 활성화 방법: 이 파일을 저장소 루트의 .github/workflows/ci.yml 로 복사하세요.
+#   - GitHub 웹: "Add file" → 경로에 `.github/workflows/ci.yml` 입력 → 아래 내용 붙여넣기
+#   - 또는 `workflow` 권한이 있는 토큰으로 push
+# 활성화하면 main 브랜치 push/PR 마다 헤드리스로 pytest가 자동 실행됩니다.
+# (README의 CI 배지도 이 워크플로를 가리킵니다.)
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: raspet-repo
+    env:
+      # 하드웨어/디스플레이 없이(헤드리스) 테스트한다.
+      RASPET_DUMMY: "1"
+      RASPET_HEADLESS: "1"
+      SDL_VIDEODRIVER: "dummy"
+      SDL_AUDIODRIVER: "dummy"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install test dependencies
+        # 게임 로직 테스트에 필요한 최소 패키지만 설치한다.
+        # (opencv/mediapipe/gpiozero/picamera2 등 하드웨어 의존 패키지는
+        #  코드에서 더미로 폴백하므로 CI에서 설치하지 않는다.)
+        run: pip install pygame Pillow numpy pytest
+
+      - name: Run tests
+        run: pytest -q

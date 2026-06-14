@@ -1,12 +1,15 @@
-"""구체 씬들 — 메뉴 · 육성(돌보기) · 미니게임 · 상점 · 엔딩.
+"""구체 씬들 — 타이틀 · 메뉴(홈) · 육성 · 미니게임 · 상점 · 업적 · 엔딩 · 팝업.
 
 각 씬은 Scene 인터페이스를 따르며, app(GameLoop)을 통해 ctx와 캐릭터에 접근한다.
 미니게임 실행 글루(launcher)도 여기 둔다 — 미니게임 모듈끼리는 서로 의존하지 않게
 하고, 앱 계층에서만 조립한다.
 """
 from .scene import Scene
-from .. import config
+from .sprite import draw_pet
+from . import daytime, sfx
+from .. import config, events, achievements
 from ..character import needs
+from ..character.mood import mood_label
 from ..character.endings import determine_ending
 from ..minigames.omok import Omok, HUMAN, AI, EMPTY
 from ..minigames.rps import RockPaperScissors
@@ -41,44 +44,154 @@ class Menu:
         for i, item in enumerate(self.items):
             sel = (i == self.index)
             color = config.COLOR_ACCENT if sel else config.COLOR_FG
-            prefix = "▶ " if sel else "  "
+            prefix = "▶" if sel else " "
             ctx.text(prefix + item, x, y + i * line, color=color)
 
 
-# ── 메뉴 씬 ──────────────────────────────────────────────
+def _wrap(text: str, width: int) -> list[str]:
+    out, cur = [], ""
+    for ch in text:
+        cur += ch
+        if len(cur) >= width:
+            out.append(cur)
+            cur = ""
+    if cur:
+        out.append(cur)
+    return out
+
+
+def _bg(ctx) -> None:
+    """현재 시간대 색조로 배경을 칠한다."""
+    ctx.clear(daytime.tint(daytime.current_period()))
+
+
+# ── 팝업 씬 (이벤트·업적 알림 공용) ──────────────────────
+class PopupScene(Scene):
+    """제목/설명 팝업을 차례로 보여주고 끝나면 return_scene으로 돌아간다."""
+
+    def __init__(self, popups: list[dict], return_scene: Scene) -> None:
+        self.popups = popups
+        self.return_scene = return_scene
+        self.i = 0
+
+    def handle_input(self, actions, app) -> None:
+        if actions:
+            self.i += 1
+            if self.i >= len(self.popups):
+                app.switch(self.return_scene)
+
+    def render(self, ctx) -> None:
+        p = self.popups[min(self.i, len(self.popups) - 1)]
+        ctx.clear()
+        ctx.rect(6, 8, ctx.width - 12, ctx.height - 16, p["color"], fill=False)
+        ctx.text(p["title"], ctx.width // 2, 18, color=p["color"],
+                 big=True, center=True)
+        for j, line in enumerate(_wrap(p["desc"], 18)):
+            ctx.text(line, ctx.width // 2, 34 + j * 9, center=True)
+        ctx.text("(아무 키)", ctx.width // 2, ctx.height - 8,
+                 color=config.COLOR_DIM, center=True)
+
+
+def _event_popup(ev: dict) -> dict:
+    return {"title": ev["title"], "desc": ev["desc"], "color": config.COLOR_WARN}
+
+
+def _ach_popup(ach: dict) -> dict:
+    return {"title": "업적 달성! " + ach["title"], "desc": ach["desc"],
+            "color": config.COLOR_ACCENT}
+
+
+def _progress_popups(app, before_event: dict | None = None) -> list[dict]:
+    """이벤트(선택) + 새로 해금된 업적을 팝업 목록으로 만든다."""
+    popups = []
+    if before_event:
+        sfx.event(app.ctx)
+        popups.append(_event_popup(before_event))
+    newly = achievements.check_and_unlock(app.character)
+    if newly:
+        sfx.achievement(app.ctx)
+        popups.extend(_ach_popup(a) for a in newly)
+    return popups
+
+
+def _go(app, return_scene, popups) -> None:
+    """팝업이 있으면 팝업을 거쳐, 없으면 곧장 return_scene으로 전환."""
+    if popups:
+        app.switch(PopupScene(popups, return_scene))
+    else:
+        app.switch(return_scene)
+
+
+# ── 타이틀 씬 ────────────────────────────────────────────
+class TitleScene(Scene):
+    def __init__(self) -> None:
+        self._t = 0.0
+
+    def handle_input(self, actions, app) -> None:
+        if actions:
+            sfx.confirm(app.ctx)
+            app.switch(MenuScene())
+
+    def update(self, dt, app) -> None:
+        self._t += dt
+
+    def render(self, ctx) -> None:
+        _bg(ctx)
+        ch = ctx.app.character
+        draw_pet(ctx, ch, ctx.width // 2, 24, scale=1.4)
+        ctx.text("RasPet", ctx.width // 2, 44, color=config.COLOR_ACCENT,
+                 big=True, center=True)
+        if int(self._t * 2) % 2 == 0:        # 깜빡이는 안내
+            ctx.text("아무 키나 누르세요", ctx.width // 2, ctx.height - 8,
+                     color=config.COLOR_DIM, center=True)
+
+
+# ── 메뉴(홈) 씬 ──────────────────────────────────────────
 class MenuScene(Scene):
-    _ITEMS = ["돌보기", "미니게임", "상점", "엔딩 보기"]
+    _ITEMS = ["돌보기", "미니게임", "상점", "탐험", "업적", "엔딩"]
 
     def __init__(self) -> None:
         self.menu = Menu(self._ITEMS)
 
     def handle_input(self, actions, app) -> None:
         for a in actions:
-            self.menu.move(a)
-            if a == "a":
+            if a in ("up", "down"):
+                self.menu.move(a)
+            elif a == "a":
                 self._select(app)
 
     def _select(self, app) -> None:
         choice = self.menu.selected
+        sfx.confirm(app.ctx)
         if choice == "돌보기":
             app.switch(CareScene())
         elif choice == "미니게임":
             app.switch(MiniGameMenuScene())
         elif choice == "상점":
             app.switch(ShopScene())
-        elif choice == "엔딩 보기":
+        elif choice == "탐험":
+            self._explore(app)
+        elif choice == "업적":
+            app.switch(AchievementScene())
+        elif choice == "엔딩":
             app.switch(EndingScene())
 
+    def _explore(self, app) -> None:
+        ev = events.force_event(app.character, app.rng)
+        _go(app, self, _progress_popups(app, before_event=ev))
+
     def render(self, ctx) -> None:
-        c = ctx.app.character if hasattr(ctx, "app") else None
-        ctx.clear()
-        ctx.text("RasPet", 6, 4, color=config.COLOR_ACCENT)
-        self.menu.render(ctx)
+        ch = ctx.app.character
+        period = daytime.current_period()
+        ctx.clear(daytime.tint(period))
+        draw_pet(ctx, ch, 26, 30, scale=1.2)
+        ctx.text(f"{ch.name} Lv.{ch.stage}", 4, 2, color=config.COLOR_ACCENT)
+        ctx.text(f"C:{ch.currency}", 4, ctx.height - 9, color=config.COLOR_WARN)
+        self.menu.render(ctx, x=66, y=8, line=9)
 
 
 # ── 돌보기(육성) 씬 ──────────────────────────────────────
 class CareScene(Scene):
-    # (라벨, 동작) — 동작은 app, character를 받는다
     _ACTIONS = [
         ("먹이주기", lambda ch: needs.feed(ch)),
         ("씻기기", lambda ch: needs.clean(ch)),
@@ -95,8 +208,9 @@ class CareScene(Scene):
 
     def handle_input(self, actions, app) -> None:
         for a in actions:
-            self.menu.move(a)
-            if a == "b":
+            if a in ("up", "down"):
+                self.menu.move(a)
+            elif a == "b":
                 app.switch(MenuScene())
             elif a == "a":
                 self._do(app)
@@ -104,25 +218,26 @@ class CareScene(Scene):
     def _do(self, app) -> None:
         label, fn = self._ACTIONS[self.menu.index]
         if fn is None:
+            sfx.cancel(app.ctx)
             app.switch(MenuScene())
-        else:
-            fn(app.character)
-            app.ctx.beep(660, 0.03)
+            return
+        fn(app.character)
+        sfx.confirm(app.ctx)
+        # 훈련으로 능력치 임계값을 넘으면 업적이 해금될 수 있다.
+        popups = _progress_popups(app)
+        if popups:
+            app.switch(PopupScene(popups, self))
 
     def render(self, ctx) -> None:
         ch = ctx.app.character
-        ctx.clear()
-        ctx.text(f"{ch.name} Lv.{ch.stage}  C:{ch.currency}", 4, 2,
-                 color=config.COLOR_ACCENT)
-        self.menu.render(ctx, x=4, y=14, line=10)
-        # 우측에 주요 상태 요약
-        rx = 74
-        lines = [f"포만 {ch.fullness}", f"청결 {ch.cleanliness}",
-                 f"행복 {ch.happiness}", f"스트 {ch.stress}",
-                 f"근 {ch.strength} 지 {ch.intellect}",
-                 f"매 {ch.charm} 감 {ch.sensitivity}"]
-        for i, s in enumerate(lines):
-            ctx.text(s, rx, 14 + i * 9, color=config.COLOR_DIM)
+        _bg(ctx)
+        draw_pet(ctx, ch, 100, 18, scale=0.8)
+        ctx.text(mood_label(ch), 78, 32, color=config.COLOR_DIM)
+        self.menu.render(ctx, x=2, y=2, line=7)
+        ctx.text(f"포{ch.fullness} 청{ch.cleanliness}", 70, 44,
+                 color=config.COLOR_DIM)
+        ctx.text(f"행{ch.happiness} 스{ch.stress}", 70, 54,
+                 color=config.COLOR_DIM)
 
 
 # ── 미니게임 선택 씬 ─────────────────────────────────────
@@ -135,8 +250,9 @@ class MiniGameMenuScene(Scene):
 
     def handle_input(self, actions, app) -> None:
         for a in actions:
-            self.menu.move(a)
-            if a == "b":
+            if a in ("up", "down"):
+                self.menu.move(a)
+            elif a == "b":
                 app.switch(MenuScene())
             elif a == "a":
                 self._launch(app)
@@ -144,21 +260,48 @@ class MiniGameMenuScene(Scene):
     def _launch(self, app) -> None:
         choice = self.menu.selected
         if choice == "뒤로":
+            sfx.cancel(app.ctx)
             app.switch(MenuScene())
-            return
-        reward = run_minigame(choice, app.ctx)
-        app.character.currency += reward
-        self.last_reward = (choice, reward)
-        app.ctx.beep(880, 0.05)
+        elif choice == "오목":
+            app.switch(DifficultyScene(self))     # 난이도 먼저 선택
+        else:
+            play_and_reward(app, self, choice)
 
     def render(self, ctx) -> None:
-        ctx.clear()
+        _bg(ctx)
         ctx.text("미니게임", 6, 2, color=config.COLOR_ACCENT)
-        self.menu.render(ctx, y=14, line=9)
+        self.menu.render(ctx, y=13, line=8)
         if self.last_reward:
             name, reward = self.last_reward
             ctx.text(f"+{reward} ({name})", 6, ctx.height - 9,
                      color=config.COLOR_WARN)
+
+
+# ── 오목 난이도 선택 씬 ──────────────────────────────────
+class DifficultyScene(Scene):
+    _LEVELS = [("쉬움", "easy"), ("보통", "normal"), ("어려움", "hard"), ("뒤로", None)]
+
+    def __init__(self, menu_scene: Scene) -> None:
+        self.menu_scene = menu_scene
+        self.menu = Menu([label for label, _ in self._LEVELS])
+
+    def handle_input(self, actions, app) -> None:
+        for a in actions:
+            if a in ("up", "down"):
+                self.menu.move(a)
+            elif a == "b":
+                app.switch(self.menu_scene)
+            elif a == "a":
+                _, diff = self._LEVELS[self.menu.index]
+                if diff is None:
+                    app.switch(self.menu_scene)
+                else:
+                    play_and_reward(app, self.menu_scene, "오목", diff)
+
+    def render(self, ctx) -> None:
+        _bg(ctx)
+        ctx.text("오목 난이도", 6, 4, color=config.COLOR_ACCENT)
+        self.menu.render(ctx, y=20, line=10)
 
 
 # ── 상점 씬 ──────────────────────────────────────────────
@@ -178,31 +321,63 @@ class ShopScene(Scene):
     def handle_input(self, actions, app) -> None:
         self._ensure(app)
         for a in actions:
-            self.menu.move(a)
-            if a == "b":
+            if a in ("up", "down"):
+                self.menu.move(a)
+            elif a == "b":
                 app.switch(MenuScene())
             elif a == "a":
                 self._buy(app)
 
     def _buy(self, app) -> None:
         if self.menu.index >= len(self.shop.catalog):   # "뒤로"
+            sfx.cancel(app.ctx)
             app.switch(MenuScene())
             return
         item = self.shop.catalog[self.menu.index]
         if self.shop.buy(app.character, item):
             self.msg = f"{item.name} 구매!"
-            app.ctx.beep(990, 0.04)
+            sfx.confirm(app.ctx)
+            popups = _progress_popups(app)     # 아이템 효과로 업적 해금 가능
+            if popups:
+                app.switch(PopupScene(popups, self))
         else:
             self.msg = "재화 부족"
+            sfx.cancel(app.ctx)
 
     def render(self, ctx) -> None:
         self._ensure(ctx.app)
         ch = ctx.app.character
-        ctx.clear()
+        _bg(ctx)
         ctx.text(f"상점  C:{ch.currency}", 4, 2, color=config.COLOR_ACCENT)
         self.menu.render(ctx, x=4, y=13, line=8)
         if self.msg:
             ctx.text(self.msg, 4, ctx.height - 9, color=config.COLOR_WARN)
+
+
+# ── 업적 씬 ──────────────────────────────────────────────
+class AchievementScene(Scene):
+    def __init__(self) -> None:
+        self.scroll = 0
+
+    def handle_input(self, actions, app) -> None:
+        total = len(config.ACHIEVEMENTS)
+        for a in actions:
+            if a == "down":
+                self.scroll = min(self.scroll + 1, max(0, total - 5))
+            elif a == "up":
+                self.scroll = max(self.scroll - 1, 0)
+            elif a == "b":
+                app.switch(MenuScene())
+
+    def render(self, ctx) -> None:
+        ch = ctx.app.character
+        _bg(ctx)
+        ctx.text("업적", 6, 2, color=config.COLOR_ACCENT)
+        rows = achievements.all_with_status(ch)
+        for i, (ach, owned) in enumerate(rows[self.scroll:self.scroll + 5]):
+            mark = "✔" if owned else "·"
+            color = config.COLOR_ACCENT if owned else config.COLOR_DIM
+            ctx.text(f"{mark} {ach['title']}", 4, 14 + i * 10, color=color)
 
 
 # ── 엔딩 씬 ──────────────────────────────────────────────
@@ -212,36 +387,40 @@ class EndingScene(Scene):
             app.switch(MenuScene())
 
     def render(self, ctx) -> None:
-        ending = determine_ending(ctx.app.character)
-        ctx.clear()
-        ctx.text("엔딩", ctx.width // 2, 6, color=config.COLOR_DIM, center=True)
-        ctx.text(ending["title"], ctx.width // 2, 22,
+        ch = ctx.app.character
+        ending = determine_ending(ch)
+        _bg(ctx)
+        draw_pet(ctx, ch, ctx.width // 2, 14, scale=0.8)
+        ctx.text(ending["title"], ctx.width // 2, 30,
                  color=config.COLOR_ACCENT, big=True, center=True)
-        # 설명을 화면 폭에 맞춰 단순 줄바꿈
-        desc = ending["desc"]
-        for i, line in enumerate(_wrap(desc, 18)):
-            ctx.text(line, ctx.width // 2, 40 + i * 9, center=True)
+        for i, line in enumerate(_wrap(ending["desc"], 18)):
+            ctx.text(line, ctx.width // 2, 44 + i * 9, center=True)
 
 
-def _wrap(text: str, width: int) -> list[str]:
-    out, cur = [], ""
-    for ch in text:
-        cur += ch
-        if len(cur) >= width:
-            out.append(cur)
-            cur = ""
-    if cur:
-        out.append(cur)
-    return out
+# ── 미니게임 실행 + 보상/이벤트/업적 처리 ────────────────
+def play_and_reward(app, return_scene, name, difficulty="normal") -> int:
+    """미니게임을 실행하고 보상·통계·이벤트·업적까지 처리한 뒤 전환한다."""
+    ctx = app.ctx
+    reward = run_minigame(name, ctx, difficulty)
+    ch = app.character
+    ch.currency += reward
+    ch.total_earned += reward
+    ch.games_played += 1
+    if reward > 0:
+        sfx.win(ctx)
+    if hasattr(return_scene, "last_reward"):
+        return_scene.last_reward = (name, reward)
+    ev = events.maybe_trigger(ch, app.rng)
+    _go(app, return_scene, _progress_popups(app, before_event=ev))
+    return reward
 
 
-# ── 미니게임 실행 글루 ───────────────────────────────────
-def run_minigame(name: str, ctx) -> int:
+def run_minigame(name: str, ctx, difficulty: str = "normal") -> int:
     """이름으로 미니게임을 만들어 실행하고 보상을 반환한다."""
     try:
         if name == "오목":
             controller = OmokController(ctx)
-            game = Omok(difficulty="normal",
+            game = Omok(difficulty=difficulty,
                         move_provider=controller.move_provider,
                         renderer=controller.render)
             return game.play()

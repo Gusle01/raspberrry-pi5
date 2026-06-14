@@ -63,8 +63,9 @@ def test_full_gameloop_smoke(tmp_path, monkeypatch):
     monkeypatch.setattr(config, "SAVE_PATH", str(tmp_path / "save.json"))
     monkeypatch.setattr(config, "SAVE_BACKEND", "json")
 
-    # 메뉴→돌보기→먹이→뒤로→미니게임→스네이크 실행→(스크립트 소진으로 종료)
+    # 타이틀→메뉴→돌보기→먹이→뒤로→미니게임→스네이크 실행→(스크립트 소진으로 종료)
     script = [
+        {"a"},          # 타이틀 → 메뉴
         {"a"},          # 메뉴: 돌보기 선택
         {"a"},          # 돌보기: 먹이주기
         {"b"},          # 뒤로 → 메뉴
@@ -82,4 +83,5 @@ def test_full_gameloop_smoke(tmp_path, monkeypatch):
 
     assert ctx.running is False
     assert ch.fullness > full_before               # 먹이주기 반영
-    assert (tmp_path / "save.json").exists()       # 종료 시 저장됨
+    assert ch.games_played == 1                     # 미니게임 1회 집계
+    assert (tmp_path / "save.json").exists()        # 종료 시 저장됨
