@@ -480,7 +480,7 @@ class AchievementScene(Scene):
         ctx.text("업적", 6, 2, color=config.COLOR_ACCENT, small=True)
         rows = achievements.all_with_status(ch)
         for i, (ach, owned) in enumerate(rows[self.scroll:self.scroll + self._VISIBLE]):
-            mark = "✔" if owned else "·"
+            mark = "★" if owned else "☆"
             color = config.COLOR_ACCENT if owned else config.COLOR_DIM
             ctx.text(f"{mark} {ach['title']}", 4, 16 + i * 12, color=color, small=True)
 

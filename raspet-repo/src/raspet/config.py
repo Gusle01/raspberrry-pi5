@@ -43,17 +43,26 @@ COLOR_WARN = (220, 120, 90)
 COLOR_DIM = (110, 120, 140)
 
 # ── 폰트 (한글 표시) ─────────────────────────────────
-# 기본 pygame 폰트는 한글 글리프가 없어 ???/□로 깨진다. 한글 폰트를 자동 탐색해 쓴다.
-# 특정 폰트를 강제하려면 FONT_PATH에 .ttf/.ttc 경로를 지정한다(없으면 자동 탐색).
+# 작은 OLED(128×64)에서 한글이 또렷하게 보이도록, 픽셀(비트맵) 한글 폰트 Galmuri를
+# repo에 번들해 기본으로 쓴다. 아웃라인 폰트(Noto 등)는 8~11px에서 획이 뭉개진다.
+# 번들 파일이 없으면 아래 FONT_CANDIDATES 자동 탐색으로 폴백한다.
+_FONT_DIR = os.path.normpath(os.path.join(os.path.dirname(__file__), "..", "..",
+                                          "assets", "fonts"))
+# 역할별 폰트 파일. 같은 크기를 유지하되 픽셀 폰트로 또렷하게 그린다.
+FONT_FILE = os.path.join(_FONT_DIR, "Galmuri11.ttf")        # 본문(11px)
+FONT_FILE_BIG = os.path.join(_FONT_DIR, "Galmuri11.ttf")    # 강조(18px)
+FONT_FILE_SMALL = os.path.join(_FONT_DIR, "Galmuri7.ttf")   # 작은 목록(8px)
+# 픽셀 폰트는 안티앨리어싱을 끄면 더 또렷하다(흑백 OLED 전송 시에도 깔끔).
+FONT_ANTIALIAS = False
+# 강제 폰트 경로(있으면 위 번들보다 우선). 자동 탐색용 폴백 패밀리 이름도 둔다.
 FONT_PATH = None
-# 자동 탐색 시 시도할 폰트 패밀리 이름 (pygame.font.match_font 용, 우선순위 순)
 FONT_CANDIDATES = [
     "notosanscjkkr", "nanumgothic", "nanumbarungothic", "notosanskr",
     "malgungothic", "applegothic", "undotum", "unbatang", "baekmukdotum",
 ]
 FONT_SIZE = 11              # 일반 텍스트 크기
 FONT_SIZE_BIG = 18         # 강조 텍스트 크기
-FONT_SIZE_SMALL = 8        # 메뉴 등 항목이 많은 목록용 (실제 높이 ≈ 12px)
+FONT_SIZE_SMALL = 8        # 메뉴 등 항목이 많은 목록용
 
 # ── GPIO 핀맵 (BCM 기준, 배선 확정 후 수정) ─────────
 PIN_ULTRASONIC_TRIG = 23

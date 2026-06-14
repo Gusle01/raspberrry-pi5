@@ -89,14 +89,24 @@ class GameContext:
         # 게임 한 프레임이 그려지는 고정 캔버스. 창에는 정수배 레터박스로,
         # OLED에는 1:1로(_to_pil) 동일하게 출력된다.
         self.surface = pygame.Surface((self.width, self.height))
-        self.font_path = resolve_korean_font_path()
+        # 폰트 우선순위: 명시적 FONT_PATH > 번들 픽셀 폰트(Galmuri) > 시스템 한글 폰트
+        fallback = resolve_korean_font_path()
+
+        def pick(bundled):
+            if config.FONT_PATH and os.path.exists(config.FONT_PATH):
+                return config.FONT_PATH
+            if bundled and os.path.exists(bundled):
+                return bundled
+            return fallback
+
+        self.font = load_font(pick(config.FONT_FILE), config.FONT_SIZE)
+        self.font_big = load_font(pick(config.FONT_FILE_BIG), config.FONT_SIZE_BIG)
+        self.font_small = load_font(pick(config.FONT_FILE_SMALL), config.FONT_SIZE_SMALL)
+        self.font_path = pick(config.FONT_FILE)
         if self.font_path is None:
             print("[RasPet] 한글 폰트를 찾지 못했습니다. 글자가 깨지면 "
                   "'sudo apt install -y fonts-noto-cjk' 또는 fonts-nanum 설치 후 다시 실행하세요.",
                   file=sys.stderr)
-        self.font = load_font(self.font_path, config.FONT_SIZE)
-        self.font_big = load_font(self.font_path, config.FONT_SIZE_BIG)
-        self.font_small = load_font(self.font_path, config.FONT_SIZE_SMALL)
 
         self._fullscreen = config.FULLSCREEN
         self.window = None
@@ -197,7 +207,7 @@ class GameContext:
 
     def text(self, s, x, y, color=config.COLOR_FG, big=False, center=False, small=False) -> None:
         font = self._font(big, small)
-        img = font.render(str(s), True, color)
+        img = font.render(str(s), config.FONT_ANTIALIAS, color)
         if center:
             rect = img.get_rect(center=(x, y))
             self.surface.blit(img, rect)
