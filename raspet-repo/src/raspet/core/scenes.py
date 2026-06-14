@@ -130,6 +130,31 @@ class PopupScene(Scene):
             ctx.text(line, cx, 42 + j * 11, center=True, small=True)        # 중심 42,53 → 바닥 ≤59
 
 
+# ── 레벨업 축하 씬 ───────────────────────────────────────
+class LevelUpScene(Scene):
+    """레벨업 직후 '신남(excited)' 표정의 펫과 새 레벨/타이틀을 보여준다."""
+
+    def __init__(self, level: int, title: str, return_scene: Scene) -> None:
+        self.level = level
+        self.title = title
+        self.return_scene = return_scene
+
+    def handle_input(self, actions, app) -> None:
+        if actions:
+            app.switch(self.return_scene)
+
+    def render(self, ctx) -> None:
+        ch = ctx.app.character
+        _bg(ctx)
+        # 표정을 'excited'로 강제해 축하 표정을 그린다(상태 무드와 무관).
+        draw_pet(ctx, ch, ctx.width // 2, 18, scale=1.2, mood="excited")
+        ctx.text("레벨 업!", ctx.width // 2, 42, color=config.COLOR_ACCENT,
+                 big=True, center=True)
+        label = f"Lv.{self.level}" + (f" {self.title}" if self.title else "")
+        ctx.text(label, ctx.width // 2, 55, color=config.COLOR_FG,
+                 center=True, small=True)
+
+
 def _event_popup(ev: dict) -> dict:
     return {"title": ev["title"], "desc": ev["desc"], "color": config.COLOR_WARN}
 
@@ -152,12 +177,46 @@ def _progress_popups(app, before_event: dict | None = None) -> list[dict]:
     return popups
 
 
-def _go(app, return_scene, popups) -> None:
-    """팝업이 있으면 팝업을 거쳐, 없으면 곧장 return_scene으로 전환."""
+def _go(app, return_scene, popups, level_up=None) -> None:
+    """레벨업 축하 → 팝업 → return_scene 순서로 이어 전환한다.
+
+    level_up: 레벨업했다면 새 레벨(int), 아니면 None. 주어지면 '신남' 표정의
+              LevelUpScene을 가장 먼저 보여준 뒤 나머지(팝업/복귀)로 이어진다.
+    """
+    target = return_scene
     if popups:
-        app.switch(PopupScene(popups, return_scene))
-    else:
-        app.switch(return_scene)
+        target = PopupScene(popups, target)
+    if level_up is not None:
+        sfx.achievement(app.ctx)
+        target = LevelUpScene(level_up, app.character.level_title(), target)
+    app.switch(target)
+
+
+def _grant_xp(app, return_scene, xp, popups) -> None:
+    """XP를 적립하고 레벨업이면 축하 화면을 거쳐 전환한다(돌보기/탐험 공용)."""
+    before, after = app.character.add_xp(xp)
+    _go(app, return_scene, popups, level_up=after if after > before else None)
+
+
+def _draw_level_hud(ctx, ch) -> None:
+    """레벨 + XP 진행 바를 화면 '하단'에 앵커해 그린다.
+
+    좌표를 ctx.height 기준으로 계산하므로 폰트/해상도가 바뀌어도 절대 화면 밖으로
+    잘리지 않는다(예전 코인 표시가 잘리던 하단 영역).
+    """
+    lvl = ch.level()
+    title = ch.level_title()
+    _, _, ratio = ch.xp_progress()
+    bar_h = 3
+    bar_y = ctx.height - bar_h - 1          # 바닥에서 1px 위
+    bar_x, bar_w = 4, 58
+    fh = ctx.font_height(small=True)
+    label = f"Lv.{lvl}" + (f" {title}" if title else "")
+    ctx.text(label, bar_x, bar_y - fh - 1, color=config.COLOR_ACCENT, small=True)
+    ctx.rect(bar_x, bar_y, bar_w, bar_h, config.COLOR_DIM, fill=False)
+    fill_w = int(bar_w * ratio)
+    if fill_w > 0:
+        ctx.rect(bar_x, bar_y, fill_w, bar_h, config.COLOR_ACCENT, fill=True)
 
 
 # ── 타이틀 씬 ────────────────────────────────────────────
@@ -222,11 +281,15 @@ class MenuScene(Scene):
         ch = ctx.app.character
         period = daytime.current_period()
         ctx.clear(daytime.tint(period))
-        draw_pet(ctx, ch, 26, 30, scale=1.2)
-        ctx.text(f"{ch.name} Lv.{ch.stage}", 4, 2, color=config.COLOR_ACCENT)
-        ctx.text_bottom(f"C:{ch.currency}", 4, color=config.COLOR_WARN, small=True)
+        draw_pet(ctx, ch, 26, 26, scale=1.2)
+        # 상단: 이름 + 재화. (진화 단계는 펫 외형으로 드러나므로 'Lv.' 텍스트는
+        #  XP 레벨 전용으로 두고 여기선 표기하지 않는다 → 'Lv' 중복 제거)
+        ctx.text(ch.name, 4, 2, color=config.COLOR_ACCENT, small=True)
+        ctx.text(f"C:{ch.currency}", 40, 2, color=config.COLOR_WARN, small=True)
         # 우측 컬럼 전체 높이를 써서 6개 항목을 모두 표시(잘림/스크롤 없음).
         self.menu.render(ctx, x=66, y=2)
+        # 하단: 레벨 + XP 진행 바 (높이 기준 앵커 → 절대 안 잘림)
+        _draw_level_hud(ctx, ch)
 
 
 # ── 돌보기(육성) 씬 ──────────────────────────────────────
@@ -262,10 +325,10 @@ class CareScene(Scene):
             return
         fn(app.character)
         sfx.confirm(app.ctx)
+        # 돌보기/훈련 XP 적립 (훈련은 라벨이 '…훈련'으로 끝난다)
+        xp = config.XP_REWARDS["train"] if label.endswith("훈련") else config.XP_REWARDS["care"]
         # 훈련으로 능력치 임계값을 넘으면 업적이 해금될 수 있다.
-        popups = _progress_popups(app)
-        if popups:
-            app.switch(PopupScene(popups, self))
+        _grant_xp(app, self, xp, _progress_popups(app))
 
     def render(self, ctx) -> None:
         ch = ctx.app.character
@@ -449,12 +512,17 @@ def play_and_reward(app, return_scene, name, difficulty="normal") -> int:
     ch.currency += reward
     ch.total_earned += reward
     ch.games_played += 1
+    # XP: 참가 기본 + 승리(보상>0) 보너스
+    xp = config.XP_REWARDS["minigame_play"]
     if reward > 0:
+        xp += config.XP_REWARDS["minigame_win"]
         sfx.win(ctx)
+    before, after = ch.add_xp(xp)
     if hasattr(return_scene, "last_reward"):
         return_scene.last_reward = (name, reward)
     ev = events.maybe_trigger(ch, app.rng)
-    _go(app, return_scene, _progress_popups(app, before_event=ev))
+    _go(app, return_scene, _progress_popups(app, before_event=ev),
+        level_up=after if after > before else None)
     return reward
 
 

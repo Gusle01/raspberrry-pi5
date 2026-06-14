@@ -163,14 +163,50 @@ ENDINGS = [
      "desc": "특출나진 않지만 평온하고 행복한 삶을 살았다."},
 ]
 
-# ── 감정(무드) 임계값 ────────────────────────────────
-# compute_mood가 위에서부터 검사한다(앞쪽이 우선순위 높음).
-MOOD_HEALTH_SICK = 25       # 체력 이하 → 아픔
-MOOD_FULLNESS_HUNGRY = 20   # 포만 이하 → 배고픔
-MOOD_CLEAN_DIRTY = 20       # 청결 이하 → 더러움
-MOOD_STRESS_HIGH = 70       # 스트레스 이상 → 짜증
-MOOD_HAPPY = 70             # 행복 이상 → 기쁨
-MOOD_SAD = 30               # 행복 이하 → 슬픔
+# ── 감정(무드) 규칙 ──────────────────────────────────
+# 표정 집합과 상태→표정 매핑을 데이터로 정의한다(코드에 임계값을 박지 않는다).
+# compute_mood가 위에서부터 검사해 조건을 모두 만족하는 첫 규칙을 채택한다(앞쪽=우선순위 높음).
+#   when: (signal, op, value) 조건들의 AND 목록. 전부 참이면 그 무드.
+#   signal: 캐릭터 속성명(health/fullness/cleanliness/stress/happiness) 또는 "period"(시간대).
+#   op: "<=" ">=" "==" "<" ">"
+# 새 표정을 추가하려면 여기 한 줄(+ sprite.py에 얼굴 하나)만 더하면 된다.
+MOODS = [
+    {"id": "sick",     "label": "아파요",     "when": [("health", "<=", 25)]},
+    {"id": "hungry",   "label": "배고파요",   "when": [("fullness", "<=", 20)]},
+    {"id": "dirty",    "label": "지저분해요", "when": [("cleanliness", "<=", 20)]},
+    {"id": "stressed", "label": "짜증나요",   "when": [("stress", ">=", 70)]},
+    # 외로움(방치): 행복이 바닥인데 배도 곯은 상태 → 단순 우울(sad)과 구분, sad보다 우선.
+    {"id": "lonely",   "label": "외로워요",   "when": [("happiness", "<=", 20),
+                                                       ("fullness", "<=", 50)]},
+    {"id": "happy",    "label": "행복해요",   "when": [("happiness", ">=", 70)]},
+    {"id": "sad",      "label": "우울해요",   "when": [("happiness", "<=", 30)]},
+    # 졸림: 밤이고 긴급/감정 상태가 아닐 때(우선순위 낮음).
+    {"id": "sleepy",   "label": "졸려요",     "when": [("period", "==", "night")]},
+    # 기본값(빈 조건 → 항상 매칭하므로 반드시 마지막).
+    {"id": "neutral",  "label": "그저그래요", "when": []},
+]
+# 상태로 자동 선택되지 않고 이벤트로만 쓰이는 무드(예: 레벨업 직후의 '신남').
+MOOD_LABELS_EXTRA = {"excited": "신나요!"}
+
+# ── XP / 레벨 (전체 진행도 레이어) ───────────────────
+# 기존 능력치·진화(stage)와 별개로 "얼마나 함께 시간을 보냈는가"를 나타내는 누적 지표.
+# 행동별 XP 획득량(데이터). 적립 위치는 scenes.play_and_reward / CareScene 참고.
+XP_REWARDS = {
+    "minigame_play": 2,    # 미니게임 참가(결과 무관)
+    "minigame_win": 8,     # 미니게임 승리(보상 > 0) — 참가와 합쳐 약 +10
+    "care": 4,             # 돌보기(먹이/씻기/놀기)
+    "train": 5,            # 능력치 훈련
+}
+# 레벨 곡선: 레벨 L→L+1 에 필요한 XP = XP_LEVEL_BASE + (L-1)*XP_LEVEL_STEP.
+# 누적 임계값은 progression.py가 이 상수로 계산한다(수치만 바꾸면 곡선이 바뀐다).
+XP_LEVEL_BASE = 40
+XP_LEVEL_STEP = 25
+XP_MAX_LEVEL = 20
+# 마일스톤 타이틀(해당 레벨 이상이면 그 타이틀 사용). 새 타이틀은 한 줄 추가로 확장.
+LEVEL_TITLES = {
+    1: "갓난아기", 3: "아기", 5: "어린이",
+    8: "청소년", 12: "어른", 16: "베테랑", 20: "전설",
+}
 
 # 성장 단계별 몸 색 (stage 0~3)
 STAGE_COLORS = [

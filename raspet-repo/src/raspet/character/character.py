@@ -2,6 +2,7 @@
 from dataclasses import dataclass, field, asdict
 
 from .. import config
+from . import progression
 
 # 엔딩/진화 판정에 쓰이는 핵심 능력치
 CORE_STATS = ("strength", "intellect", "charm", "sensitivity")
@@ -35,7 +36,8 @@ class Character:
     # 진행
     currency: int = 0       # 재화
     inventory: list = field(default_factory=list)
-    stage: int = 0          # 성장 단계(진화)
+    stage: int = 0          # 성장 단계(진화: 누적 능력치 기반)
+    xp: int = 0             # 누적 경험치(전체 진행도 레이어 → 레벨은 여기서 파생)
     # 통계/도전 과제
     games_played: int = 0           # 미니게임 플레이 횟수
     total_earned: int = 0           # 누적 획득 재화
@@ -86,6 +88,25 @@ class Character:
                 stage = i
         self.stage = stage
         return stage
+
+    # ── XP / 레벨 (전체 진행도) ──────────────────────────
+    def level(self) -> int:
+        """누적 XP로부터 파생된 현재 레벨(1~)."""
+        return progression.level_for_xp(self.xp)
+
+    def level_title(self) -> str:
+        """현재 레벨의 마일스톤 타이틀(예: '어린이')."""
+        return progression.title_for_level(self.level())
+
+    def xp_progress(self) -> tuple[int, int, float]:
+        """현재 레벨 구간의 (채운 XP, 필요 XP, 진행비율). HUD 진행 바에 쓴다."""
+        return progression.progress(self.xp)
+
+    def add_xp(self, amount: int) -> tuple[int, int]:
+        """XP를 더하고 (이전 레벨, 새 레벨)을 반환한다. 레벨업 감지용."""
+        before = self.level()
+        self.xp = max(0, self.xp + int(amount))
+        return before, self.level()
 
     # ── 직렬화 ──────────────────────────────────────────
     def to_dict(self) -> dict:

@@ -12,12 +12,14 @@ def test_mood_priority_sick_over_hungry():
 
 
 def test_mood_states():
-    assert compute_mood(Character(health=100, fullness=5)) == "hungry"
-    assert compute_mood(Character(cleanliness=5)) == "dirty"
-    assert compute_mood(Character(stress=90)) == "stressed"
-    assert compute_mood(Character(happiness=95)) == "happy"
-    assert compute_mood(Character(happiness=10)) == "sad"
-    assert compute_mood(Character(happiness=50)) == "neutral"
+    # period='day'로 고정해 시간 의존적인 졸림(sleepy)과 무관하게 검증한다.
+    d = "day"
+    assert compute_mood(Character(health=100, fullness=5), period=d) == "hungry"
+    assert compute_mood(Character(cleanliness=5), period=d) == "dirty"
+    assert compute_mood(Character(stress=90), period=d) == "stressed"
+    assert compute_mood(Character(happiness=95), period=d) == "happy"
+    assert compute_mood(Character(happiness=10), period=d) == "sad"
+    assert compute_mood(Character(happiness=50), period=d) == "neutral"
 
 
 # ── 시간대 ───────────────────────────────────────────────

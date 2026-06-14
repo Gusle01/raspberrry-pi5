@@ -16,13 +16,16 @@ def tmp_paths(tmp_path, monkeypatch):
 @pytest.mark.parametrize("backend", ["json", "sqlite"])
 def test_save_load_roundtrip(tmp_paths, monkeypatch, backend):
     monkeypatch.setattr(config, "SAVE_BACKEND", backend)
-    ch = Character(name="별이", intellect=33, currency=120, inventory=["hat"])
+    ch = Character(name="별이", intellect=33, currency=120, inventory=["hat"], xp=275)
     save.save_game(ch)
     data = save.load_game()
     assert data is not None
     assert "saved_at" in data
     restored = Character.from_dict(data["character"])
     assert restored == ch
+    # XP/레벨이 재시작 후에도 유지된다
+    assert restored.xp == 275
+    assert restored.level() == ch.level()
 
 
 def test_load_missing_returns_none(tmp_paths, monkeypatch):
