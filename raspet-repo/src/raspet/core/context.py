@@ -7,6 +7,7 @@
 행동(action) 문자열: 'up' 'down' 'left' 'right' 'a'(확인) 'b'(취소)
 """
 import os
+import sys
 
 from .. import config
 
@@ -15,7 +16,43 @@ if config.HEADLESS:
     os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
     os.environ.setdefault("SDL_AUDIODRIVER", "dummy")
 
+import glob  # noqa: E402
+
 import pygame  # noqa: E402  (SDL 환경변수 설정 후 임포트해야 함)
+
+# 한글 폰트 파일을 직접 찾을 때 훑어볼 경로 패턴
+_FONT_GLOBS = [
+    "/usr/share/fonts/**/NotoSansCJK*.ttc",
+    "/usr/share/fonts/**/Nanum*.ttf",
+    "/usr/share/fonts/**/Un*.ttf",
+    "/usr/share/fonts/**/*Gothic*.tt?",
+]
+
+
+def resolve_korean_font_path() -> str | None:
+    """한글 글리프가 있는 폰트 파일 경로를 찾는다. 못 찾으면 None."""
+    if config.FONT_PATH and os.path.exists(config.FONT_PATH):
+        return config.FONT_PATH
+    for family in config.FONT_CANDIDATES:          # 폰트 패밀리 이름으로 탐색
+        path = pygame.font.match_font(family)
+        if path:
+            return path
+    for pattern in _FONT_GLOBS:                     # 파일 경로 직접 탐색
+        hits = sorted(glob.glob(pattern, recursive=True))
+        if hits:
+            return hits[0]
+    return None
+
+
+def load_font(path: str | None, size: int):
+    """폰트를 로드한다. 경로가 없거나 실패하면 기본 폰트(라틴 전용)로 폴백."""
+    if path:
+        try:
+            return pygame.font.Font(path, size)
+        except Exception:
+            pass
+    return pygame.font.SysFont(None, size)
+
 
 # 키보드 → 행동 매핑 (PC 개발용)
 _KEYMAP = {
@@ -49,8 +86,13 @@ class GameContext:
 
         pygame.init()
         self.surface = pygame.Surface((self.width, self.height))
-        self.font = pygame.font.SysFont(None, 11)
-        self.font_big = pygame.font.SysFont(None, 18)
+        self.font_path = resolve_korean_font_path()
+        if self.font_path is None:
+            print("[RasPet] 한글 폰트를 찾지 못했습니다. 글자가 깨지면 "
+                  "'sudo apt install -y fonts-noto-cjk' 또는 fonts-nanum 설치 후 다시 실행하세요.",
+                  file=sys.stderr)
+        self.font = load_font(self.font_path, config.FONT_SIZE)
+        self.font_big = load_font(self.font_path, config.FONT_SIZE_BIG)
 
         if not self.headless:
             scale = config.WINDOW_SCALE

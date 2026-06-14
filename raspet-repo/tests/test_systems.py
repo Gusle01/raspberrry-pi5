@@ -87,6 +87,16 @@ def test_all_with_status():
     assert all(owned is False for _, owned in rows)
 
 
+# ── 폰트 로딩 (한글 폰트 자동 탐색 / 폴백) ───────────────
+def test_font_loads_and_renders():
+    from raspet.core.context import resolve_korean_font_path, load_font
+    path = resolve_korean_font_path()      # 한글 폰트 또는 None(폴백)
+    font = load_font(path, 12)             # 어느 쪽이든 로드는 성공해야 함
+    assert font is not None
+    surf = font.render("RasPet 123", True, (255, 255, 255))
+    assert surf.get_width() > 0
+
+
 # ── 스프라이트 렌더 (충돌 없이 그려지는지) ───────────────
 def test_sprite_renders_all_stages_and_moods():
     from raspet.core.context import GameContext

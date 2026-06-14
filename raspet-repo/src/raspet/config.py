@@ -27,6 +27,18 @@ COLOR_ACCENT = (90, 200, 160)
 COLOR_WARN = (220, 120, 90)
 COLOR_DIM = (110, 120, 140)
 
+# ── 폰트 (한글 표시) ─────────────────────────────────
+# 기본 pygame 폰트는 한글 글리프가 없어 ???/□로 깨진다. 한글 폰트를 자동 탐색해 쓴다.
+# 특정 폰트를 강제하려면 FONT_PATH에 .ttf/.ttc 경로를 지정한다(없으면 자동 탐색).
+FONT_PATH = None
+# 자동 탐색 시 시도할 폰트 패밀리 이름 (pygame.font.match_font 용, 우선순위 순)
+FONT_CANDIDATES = [
+    "notosanscjkkr", "nanumgothic", "nanumbarungothic", "notosanskr",
+    "malgungothic", "applegothic", "undotum", "unbatang", "baekmukdotum",
+]
+FONT_SIZE = 11              # 일반 텍스트 크기
+FONT_SIZE_BIG = 18         # 강조 텍스트 크기
+
 # ── GPIO 핀맵 (BCM 기준, 배선 확정 후 수정) ─────────
 PIN_ULTRASONIC_TRIG = 23
 PIN_ULTRASONIC_ECHO = 24
