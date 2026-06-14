@@ -1,21 +1,61 @@
 """카메라 캡처 (picamera2).
 
 CSI 카메라에서 프레임을 가져온다.
+picamera2가 없으면 더미(빈 프레임) 구현으로 폴백한다.
 """
+try:
+    from picamera2 import Picamera2
+    _CAM_AVAILABLE = True
+except Exception:
+    _CAM_AVAILABLE = False
 
 
 class Camera:
     """picamera2 래퍼."""
 
     def __init__(self) -> None:
-        # TODO: Picamera2 초기화 및 설정
+        self._cam = None
+        if _CAM_AVAILABLE:
+            self._cam = Picamera2()
+            cfg = self._cam.create_preview_configuration(
+                main={"format": "RGB888", "size": (640, 480)})
+            self._cam.configure(cfg)
+            self._cam.start()
+
+    @property
+    def available(self) -> bool:
+        return self._cam is not None
+
+    def capture_frame(self):
+        """현재 프레임(numpy 배열, RGB)을 반환한다. 없으면 None."""
+        if self._cam is None:
+            return None
+        return self._cam.capture_array()
+
+    def close(self) -> None:
+        if self._cam is not None:
+            self._cam.stop()
+            self._cam = None
+
+
+class DummyCamera(Camera):
+    """카메라가 없을 때 사용하는 더미."""
+
+    def __init__(self) -> None:
         self._cam = None
 
     def capture_frame(self):
-        """현재 프레임(numpy 배열)을 반환한다."""
-        # TODO: 프레임 캡처
-        raise NotImplementedError
+        return None
 
-    def close(self) -> None:
-        # TODO: 카메라 해제
-        pass
+
+def create_camera() -> Camera:
+    """가능하면 실제 카메라, 아니면 더미를 반환한다."""
+    from .. import config
+    if config.USE_DUMMY_HARDWARE:
+        return DummyCamera()
+    if _CAM_AVAILABLE:
+        try:
+            return Camera()
+        except Exception:
+            pass
+    return DummyCamera()
