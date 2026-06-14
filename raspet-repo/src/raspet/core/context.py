@@ -188,14 +188,31 @@ class GameContext:
     def clear(self, color=config.COLOR_BG) -> None:
         self.surface.fill(color)
 
+    def _font(self, big=False, small=False):
+        return self.font_big if big else (self.font_small if small else self.font)
+
+    def font_height(self, big=False, small=False) -> int:
+        """선택한 폰트의 실제 픽셀 높이. 레이아웃·하단 앵커 계산에 쓴다."""
+        return self._font(big, small).get_height()
+
     def text(self, s, x, y, color=config.COLOR_FG, big=False, center=False, small=False) -> None:
-        font = self.font_big if big else (self.font_small if small else self.font)
+        font = self._font(big, small)
         img = font.render(str(s), True, color)
         if center:
             rect = img.get_rect(center=(x, y))
             self.surface.blit(img, rect)
         else:
             self.surface.blit(img, (x, y))
+
+    def text_bottom(self, s, x, color=config.COLOR_FG, big=False, small=False,
+                    center=False, margin=2) -> None:
+        """하단 앵커 텍스트 — 글자 높이를 고려해 캔버스 바닥에서 margin 위에 그린다.
+
+        고정 y 대신 이걸 쓰면 폰트 크기가 달라져도 항상 화면 안(y+높이 ≤ GAME_H)에
+        들어온다. HUD(코인/재화/안내문) 등 하단 고정 요소에 사용한다.
+        """
+        y = self.height - self._font(big, small).get_height() - margin
+        self.text(s, x, y, color=color, big=big, small=small, center=center)
 
     def rect(self, x, y, w, h, color, fill=True) -> None:
         pygame.draw.rect(self.surface, color, (x, y, w, h), 0 if fill else 1)

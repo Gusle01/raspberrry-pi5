@@ -40,28 +40,38 @@ class Menu:
     def selected(self) -> str:
         return self.items[self.index]
 
-    def render(self, ctx, x=6, y=18, line=None, small=True) -> None:
-        """항목을 세로로 그린다.
+    def render(self, ctx, x=6, y=2, line=None, small=True) -> None:
+        """항목을 세로로 그린다(y부터 캔버스 바닥까지 사용).
 
-        화면(128×64)에 다 안 들어가는 항목 수도 처리한다: 선택 항목이 항상
-        보이도록 스크롤하고, 위/아래에 더 있으면 ▲/▼로 표시한다. 기본은
-        작은 폰트(config.FONT_SIZE_SMALL)를 써서 한 화면에 더 많이 보인다.
+        가능하면 줄 간격을 좁혀서라도 **전부** 보이게 하고, 그래도 영역을 넘으면
+        선택 항목을 따라 스크롤하며 가려진 쪽에 ▲/▼를 표시한다. 어떤 경우에도
+        항목이 캔버스(GAME_H) 밖으로 잘리지 않는다.
         """
         font = ctx.font_small if small else ctx.font
-        if line is None:
-            line = font.get_height() + 1   # 줄이 서로 겹치지 않도록 폰트 높이+여백
-
+        fh = font.get_height()
         n = len(self.items)
-        avail = ctx.height - y
-        visible = max(1, avail // line)
+        avail = ctx.height - y                      # 메뉴가 쓸 수 있는 세로 공간
 
-        if n <= visible:
-            start = 0
-        else:
-            # 선택 항목을 화면 중앙 부근에 두되, 끝부분에서는 목록 끝에 맞춘다.
+        if line is None:
+            # 마지막 항목 바닥 = (k-1)*line + fh 이므로, n개가 들어갈 최대 줄간격은
+            # (avail - fh) // (n-1). 이 공식으로 off-by-one 없이 정확히 맞춘다.
+            fit = (avail - fh) // (n - 1) if n > 1 else avail
+            min_line = max(8, fh - 3)               # 가독 한계까지 좁혀 더 담는다
+            if fit >= fh + 1:
+                line = fh + 1                       # 여유 충분 → 보기 좋은 간격
+            elif fit >= min_line:
+                line = fit                          # 살짝 좁혀 전부 표시
+            else:
+                line = fh + 1                       # 한 화면에 불가 → 스크롤
+
+        # 마지막 항목 바닥이 avail 안에 들어오는 최대 개수 = (avail - fh)//line + 1
+        visible = max(1, (avail - fh) // line + 1)
+        if visible >= n:                            # 전부 보임
+            visible, start = n, 0
+        else:                                       # 스크롤: 선택 항목을 가운데 부근에
             start = min(max(0, self.index - visible // 2), n - visible)
 
-        for row, i in enumerate(range(start, min(start + visible, n))):
+        for row, i in enumerate(range(start, start + visible)):
             sel = (i == self.index)
             color = config.COLOR_ACCENT if sel else config.COLOR_FG
             prefix = "▶" if sel else " "
@@ -111,12 +121,13 @@ class PopupScene(Scene):
         p = self.popups[min(self.i, len(self.popups) - 1)]
         ctx.clear()
         ctx.rect(6, 8, ctx.width - 12, ctx.height - 16, p["color"], fill=False)
-        ctx.text(p["title"], ctx.width // 2, 18, color=p["color"],
-                 big=True, center=True)
-        for j, line in enumerate(_wrap(p["desc"], 18)):
-            ctx.text(line, ctx.width // 2, 34 + j * 9, center=True)
-        ctx.text("(아무 키)", ctx.width // 2, ctx.height - 8,
-                 color=config.COLOR_DIM, center=True)
+        cx = ctx.width // 2
+        # center=True 일 때 y는 글자의 '세로 중심'이다. 박스 폭에 맞게 제목을
+        # 줄바꿈(최대 2줄)해 가로 넘침을 막고, 본문은 작은 폰트로 하단에 둔다.
+        for k, line in enumerate(_wrap(p["title"], 8)[:2]):
+            ctx.text(line, cx, 12 + k * 15, color=p["color"], center=True)  # 중심 12,27 → 바닥 ≤35
+        for j, line in enumerate(_wrap(p["desc"], 18)[:2]):
+            ctx.text(line, cx, 42 + j * 11, center=True, small=True)        # 중심 42,53 → 바닥 ≤59
 
 
 def _event_popup(ev: dict) -> dict:
@@ -169,8 +180,8 @@ class TitleScene(Scene):
         ctx.text("RasPet", ctx.width // 2, 44, color=config.COLOR_ACCENT,
                  big=True, center=True)
         if int(self._t * 2) % 2 == 0:        # 깜빡이는 안내
-            ctx.text("아무 키나 누르세요", ctx.width // 2, ctx.height - 8,
-                     color=config.COLOR_DIM, center=True)
+            ctx.text_bottom("아무 키나 누르세요", ctx.width // 2,
+                            color=config.COLOR_DIM, center=True, small=True, margin=3)
 
 
 # ── 메뉴(홈) 씬 ──────────────────────────────────────────
@@ -213,8 +224,9 @@ class MenuScene(Scene):
         ctx.clear(daytime.tint(period))
         draw_pet(ctx, ch, 26, 30, scale=1.2)
         ctx.text(f"{ch.name} Lv.{ch.stage}", 4, 2, color=config.COLOR_ACCENT)
-        ctx.text(f"C:{ch.currency}", 4, ctx.height - 9, color=config.COLOR_WARN)
-        self.menu.render(ctx, x=66, y=8)
+        ctx.text_bottom(f"C:{ch.currency}", 4, color=config.COLOR_WARN, small=True)
+        # 우측 컬럼 전체 높이를 써서 6개 항목을 모두 표시(잘림/스크롤 없음).
+        self.menu.render(ctx, x=66, y=2)
 
 
 # ── 돌보기(육성) 씬 ──────────────────────────────────────
@@ -259,12 +271,13 @@ class CareScene(Scene):
         ch = ctx.app.character
         _bg(ctx)
         draw_pet(ctx, ch, 100, 18, scale=0.8)
-        ctx.text(mood_label(ch), 78, 32, color=config.COLOR_DIM)
+        ctx.text(mood_label(ch), 78, 30, color=config.COLOR_DIM, small=True)
         self.menu.render(ctx, x=2, y=2)
-        ctx.text(f"포{ch.fullness} 청{ch.cleanliness}", 70, 44,
-                 color=config.COLOR_DIM)
-        ctx.text(f"행{ch.happiness} 스{ch.stress}", 70, 54,
-                 color=config.COLOR_DIM)
+        # 우측 스탯 2줄 — 작은 폰트로 화면 안에 들어오게(y=40,52 → 바닥 64 이내).
+        ctx.text(f"포{ch.fullness} 청{ch.cleanliness}", 70, 40,
+                 color=config.COLOR_DIM, small=True)
+        ctx.text(f"행{ch.happiness} 스{ch.stress}", 70, 52,
+                 color=config.COLOR_DIM, small=True)
 
 
 # ── 미니게임 선택 씬 ─────────────────────────────────────
@@ -300,8 +313,8 @@ class MiniGameMenuScene(Scene):
         self.menu.render(ctx, y=13)
         if self.last_reward:
             name, reward = self.last_reward
-            ctx.text(f"+{reward} ({name})", 6, ctx.height - 9,
-                     color=config.COLOR_WARN)
+            ctx.text_bottom(f"+{reward} ({name})", 6,
+                            color=config.COLOR_WARN, small=True)
 
 
 # ── 오목 난이도 선택 씬 ──────────────────────────────────
@@ -378,7 +391,7 @@ class ShopScene(Scene):
         ctx.text(f"상점  C:{ch.currency}", 4, 2, color=config.COLOR_ACCENT)
         self.menu.render(ctx, x=4, y=13)
         if self.msg:
-            ctx.text(self.msg, 4, ctx.height - 9, color=config.COLOR_WARN)
+            ctx.text_bottom(self.msg, 4, color=config.COLOR_WARN, small=True)
 
 
 # ── 업적 씬 ──────────────────────────────────────────────
@@ -386,11 +399,13 @@ class AchievementScene(Scene):
     def __init__(self) -> None:
         self.scroll = 0
 
+    _VISIBLE = 4   # 한 화면에 보이는 업적 줄 수(작은 폰트 12px 기준, 화면 안에 들어옴)
+
     def handle_input(self, actions, app) -> None:
         total = len(config.ACHIEVEMENTS)
         for a in actions:
             if a == "down":
-                self.scroll = min(self.scroll + 1, max(0, total - 5))
+                self.scroll = min(self.scroll + 1, max(0, total - self._VISIBLE))
             elif a == "up":
                 self.scroll = max(self.scroll - 1, 0)
             elif a == "b":
@@ -399,12 +414,12 @@ class AchievementScene(Scene):
     def render(self, ctx) -> None:
         ch = ctx.app.character
         _bg(ctx)
-        ctx.text("업적", 6, 2, color=config.COLOR_ACCENT)
+        ctx.text("업적", 6, 2, color=config.COLOR_ACCENT, small=True)
         rows = achievements.all_with_status(ch)
-        for i, (ach, owned) in enumerate(rows[self.scroll:self.scroll + 5]):
+        for i, (ach, owned) in enumerate(rows[self.scroll:self.scroll + self._VISIBLE]):
             mark = "✔" if owned else "·"
             color = config.COLOR_ACCENT if owned else config.COLOR_DIM
-            ctx.text(f"{mark} {ach['title']}", 4, 14 + i * 10, color=color)
+            ctx.text(f"{mark} {ach['title']}", 4, 16 + i * 12, color=color, small=True)
 
 
 # ── 엔딩 씬 ──────────────────────────────────────────────
@@ -417,11 +432,12 @@ class EndingScene(Scene):
         ch = ctx.app.character
         ending = determine_ending(ch)
         _bg(ctx)
-        draw_pet(ctx, ch, ctx.width // 2, 14, scale=0.8)
-        ctx.text(ending["title"], ctx.width // 2, 30,
+        draw_pet(ctx, ch, ctx.width // 2, 12, scale=0.8)
+        ctx.text(ending["title"], ctx.width // 2, 26,
                  color=config.COLOR_ACCENT, big=True, center=True)
-        for i, line in enumerate(_wrap(ending["desc"], 18)):
-            ctx.text(line, ctx.width // 2, 44 + i * 9, center=True)
+        # 본문은 작은 폰트로 최대 2줄(y=40,51 → 바닥 64 이내).
+        for i, line in enumerate(_wrap(ending["desc"], 20)[:2]):
+            ctx.text(line, ctx.width // 2, 40 + i * 11, center=True, small=True)
 
 
 # ── 미니게임 실행 + 보상/이벤트/업적 처리 ────────────────
