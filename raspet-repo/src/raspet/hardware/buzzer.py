@@ -18,20 +18,35 @@ class Buzzer:
     def __init__(self) -> None:
         self._buzzer = None
         if _GPIO_AVAILABLE and config.PIN_BUZZER is not None:
-            self._buzzer = TonalBuzzer(config.PIN_BUZZER)
+            # 효과음이 392~1047Hz를 쓴다. 기본(1옥타브, 약 220~880Hz)으론 좁아
+            # 범위를 벗어난 음에서 ValueError가 나므로 2옥타브(약 110~1760Hz)로 잡는다.
+            self._buzzer = TonalBuzzer(config.PIN_BUZZER, octaves=2)
 
     @property
     def available(self) -> bool:
         return self._buzzer is not None
 
     def beep(self, freq: int = 880, duration: float = 0.1) -> None:
-        """지정 주파수로 잠깐 소리를 낸다."""
+        """지정 주파수로 잠깐 소리를 낸다.
+
+        효과음은 부가 요소이므로, 범위를 벗어나거나 장치 오류가 나더라도
+        게임이 멈추지 않게 주파수를 지원 범위로 보정하고 예외를 삼킨다.
+        """
         if self._buzzer is None:
             return
         import time
-        self._buzzer.play(Tone(frequency=freq))
-        time.sleep(duration)
-        self._buzzer.stop()
+        try:
+            lo = self._buzzer.min_tone.frequency
+            hi = self._buzzer.max_tone.frequency
+            freq = max(lo, min(hi, freq))     # 장치 지원 범위로 클램프
+            self._buzzer.play(Tone(frequency=freq))
+            time.sleep(duration)
+            self._buzzer.stop()
+        except Exception:                     # 효과음 실패가 게임을 멈추게 하지 않는다
+            try:
+                self._buzzer.stop()
+            except Exception:
+                pass
 
 
 class DummyBuzzer(Buzzer):
