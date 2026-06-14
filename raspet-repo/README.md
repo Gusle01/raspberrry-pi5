@@ -119,7 +119,8 @@ raspet/
 │   ├── 임베디드_프로젝트_계획서_RasPet.docx
 │   ├── project-plan.md      #  계획서 (웹에서 바로 읽을 수 있는 마크다운 버전)
 │   ├── roadmap.md           #  개발 단계·마일스톤
-│   └── hardware-wiring.md   #  배선 가이드 (핀맵·분압·인터페이스 활성화)
+│   ├── setup-and-gpio.md    #  실행 & GPIO 구성 가이드 (PC·Pi)
+│   └── hardware-wiring.md   #  배선 전기 세부사항 (핀맵·분압·인터페이스)
 ├── src/raspet/
 │   ├── config.py            # 전역 설정 (해상도, 핀맵, 밸런스, 이벤트·업적·엔딩)
 │   ├── app.py               # 애플리케이션 부트스트랩
@@ -141,6 +142,8 @@ raspet/
 ---
 
 ## 🚀 설치 및 실행
+
+> 📖 **자세한 실행 방법과 GPIO 배선은 [`docs/setup-and-gpio.md`](docs/setup-and-gpio.md)에 단계별로 정리되어 있습니다.** (PC 미리보기 · Pi 실기 · 핀맵 · 자동 시작 · 문제 해결)
 
 > Raspberry Pi 5 / Raspberry Pi OS (64-bit) 기준입니다.
 
