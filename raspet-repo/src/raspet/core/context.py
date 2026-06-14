@@ -94,17 +94,30 @@ class GameContext:
         self.font = load_font(self.font_path, config.FONT_SIZE)
         self.font_big = load_font(self.font_path, config.FONT_SIZE_BIG)
 
+        self._fullscreen = config.FULLSCREEN
+        self.window = None
         if not self.headless:
-            scale = config.WINDOW_SCALE
-            self.window = pygame.display.set_mode(
-                (self.width * scale, self.height * scale))
+            self._create_window()
             pygame.display.set_caption("RasPet")
-        else:
-            self.window = None
 
         self.clock = pygame.time.Clock()
         self._actions: set[str] = set()
         self._prev_dir = "center"   # 조이스틱 엣지 검출용
+
+    # ── 창 관리 ─────────────────────────────────────────
+    def _create_window(self) -> None:
+        """현재 모드(전체화면/창)에 맞게 표시 창을 만든다."""
+        if self._fullscreen:
+            self.window = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
+        else:
+            flags = pygame.RESIZABLE if config.WINDOW_RESIZABLE else 0
+            self.window = pygame.display.set_mode(
+                (self.width * config.WINDOW_SCALE,
+                 self.height * config.WINDOW_SCALE), flags)
+
+    def toggle_fullscreen(self) -> None:
+        self._fullscreen = not self._fullscreen
+        self._create_window()
 
     # ── 입력 ────────────────────────────────────────────
     def poll(self) -> set[str]:
@@ -122,6 +135,12 @@ class GameContext:
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 self.running = False
+            elif event.type == pygame.VIDEORESIZE and not self._fullscreen:
+                self.window = pygame.display.set_mode(
+                    event.size,
+                    pygame.RESIZABLE if config.WINDOW_RESIZABLE else 0)
+            elif event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
+                self.toggle_fullscreen()
             elif event.type == pygame.KEYDOWN and event.key in _KEYMAP:
                 self._actions.add(_KEYMAP[event.key])
 
@@ -180,10 +199,17 @@ class GameContext:
         pygame.draw.line(self.surface, color, (x1, y1), (x2, y2), width)
 
     def present(self) -> None:
-        """그린 프레임을 창과 OLED로 내보낸다."""
+        """그린 프레임을 창과 OLED로 내보낸다.
+
+        창에는 가로세로 비율을 유지한 채 최대한 크게(레터박스) 그려 찌그러짐을 막는다.
+        """
         if self.window is not None:
-            scaled = pygame.transform.scale(self.surface, self.window.get_size())
-            self.window.blit(scaled, (0, 0))
+            win_w, win_h = self.window.get_size()
+            scale = min(win_w / self.width, win_h / self.height)
+            sw, sh = int(self.width * scale), int(self.height * scale)
+            scaled = pygame.transform.scale(self.surface, (sw, sh))
+            self.window.fill((0, 0, 0))   # 남는 영역(레터박스)은 검정
+            self.window.blit(scaled, ((win_w - sw) // 2, (win_h - sh) // 2))
             pygame.display.flip()
         display = self.hw.get("display")
         if display is not None and getattr(display, "available", False):

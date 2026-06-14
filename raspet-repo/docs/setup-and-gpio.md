@@ -187,8 +187,28 @@ PY
 | 이동 | 방향키 / WASD | 조이스틱 기울임 |
 | 확인 | Enter / Space / Z | 조이스틱 버튼 |
 | 취소 | Esc / Backspace / X | (버튼 매핑) |
+| 전체화면 토글 | **F11** | — |
 
 게임 흐름: **타이틀 → 홈(메뉴)** → 돌보기 · 미니게임 · 상점 · 탐험 · 업적 · 엔딩
+
+### 화면 크기 / 해상도
+
+게임은 **OLED 실해상도(기본 128×64)** 로 그린 뒤, HDMI 모니터에서는 그 화면을
+비율을 유지한 채 확대해 보여줍니다(찌그러지지 않게 레터박스 처리).
+
+- 모니터 창이 **너무 작으면** `config.py`의 `WINDOW_SCALE`을 키우세요 (예: `8` → `12`).
+- 창 **모서리를 드래그**해 크기를 바꿀 수 있습니다(`WINDOW_RESIZABLE`).
+- **F11** 또는 `RASPET_FULLSCREEN=1 python main.py` 로 전체화면.
+- **다른 OLED/LCD 패널**(예: 128×128 SSD1351)을 쓴다면 `SCREEN_WIDTH`·`SCREEN_HEIGHT`를
+  그 패널 해상도로 바꾸고, 필요 시 `hardware/display.py`의 드라이버를 교체하세요.
+
+```python
+# src/raspet/config.py
+SCREEN_WIDTH = 128         # 게임 내부 해상도 = OLED 실해상도
+SCREEN_HEIGHT = 64
+WINDOW_SCALE = 8           # 모니터 미리보기 확대 배율 (8 → 1024×512)
+WINDOW_RESIZABLE = True    # 창 크기 조절 허용
+```
 
 ---
 
@@ -198,6 +218,7 @@ PY
 |---|---|---|
 | `RASPET_DUMMY` | `1` | 실제 장치를 잡지 않고 더미로 동작 (PC 개발) |
 | `RASPET_HEADLESS` | `1` | 창/OLED 없이 게임 루프 구동 (테스트·CI) |
+| `RASPET_FULLSCREEN` | `1` | 전체화면으로 시작 (게임 중 F11로도 토글) |
 | `GPIOZERO_PIN_FACTORY` | `lgpio` | Pi 5에서 GPIO 백엔드 명시 (필요 시) |
 
 ---

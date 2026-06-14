@@ -18,7 +18,12 @@ HEADLESS = os.environ.get("RASPET_HEADLESS", "0") == "1"
 SCREEN_WIDTH = 128
 SCREEN_HEIGHT = 64          # 컬러 디스플레이 사용 시 128 등으로 변경
 FPS = 30
-WINDOW_SCALE = 5            # 데스크톱 미리보기 창 확대 배율 (OLED는 1로 동작)
+# 게임은 SCREEN_WIDTH×SCREEN_HEIGHT(=OLED 실해상도)로 그린 뒤,
+# 모니터(HDMI)에서는 아래 배율로 확대해 보여준다. OLED 출력은 이 값과 무관.
+WINDOW_SCALE = 8           # 데스크톱 미리보기 창 확대 배율 (예: 8 → 1024×512)
+WINDOW_RESIZABLE = True    # 창 크기 조절 허용 (모서리 드래그)
+# 환경변수 RASPET_FULLSCREEN=1 이면 전체화면으로 시작 (게임 중 F11로도 토글)
+FULLSCREEN = os.environ.get("RASPET_FULLSCREEN", "0") == "1"
 
 # 색상 팔레트 (RGB) — 흑백 OLED에서는 임계값으로 이진화된다.
 COLOR_BG = (8, 12, 24)
