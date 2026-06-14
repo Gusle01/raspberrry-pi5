@@ -64,6 +64,10 @@ _KEYMAP = {
     pygame.K_ESCAPE: "b", pygame.K_BACKSPACE: "b", pygame.K_x: "b",
 }
 
+# 물리 버튼 인덱스 → 행동. PC의 ← ↓ → 와 같은 액션으로 들어오게 해 입력 경로를 통일한다
+# (두더지 잡기의 구멍 0·1·2에 대응).
+_BUTTON_ACTIONS = {0: "left", 1: "down", 2: "right"}
+
 
 class GameContext:
     """입력/출력/하드웨어 게이트웨이."""
@@ -173,6 +177,14 @@ class GameContext:
                 self._actions.add("a")
             self._prev_dir = d
 
+        # 물리 버튼(있으면): 눌린 순간만 ←↓→ 액션으로 (PC 키와 동일 경로)
+        buttons = self.hw.get("buttons")
+        if buttons is not None and getattr(buttons, "available", False):
+            for idx in buttons.pressed_edges():
+                act = _BUTTON_ACTIONS.get(idx)
+                if act:
+                    self._actions.add(act)
+
         return self._actions
 
     @property
@@ -265,6 +277,17 @@ class GameContext:
         if bz is not None:
             bz.beep(freq, duration)
 
+    def led(self, index, on) -> None:
+        """index번 LED를 켜거나 끈다(장치 없으면 무시)."""
+        leds = self.hw.get("leds")
+        if leds is not None:
+            leds.set(index, on)
+
+    def leds_off(self) -> None:
+        leds = self.hw.get("leds")
+        if leds is not None:
+            leds.all_off()
+
     def distance_cm(self) -> float:
         u = self.hw.get("ultrasonic")
         return u.distance_cm() if u is not None else config.JUMP_DISTANCE_MAX_CM
@@ -280,4 +303,12 @@ class GameContext:
         return hand.classify_gesture(self.capture_frame())
 
     def quit(self) -> None:
+        # GPIO 자원(LED·버튼) 정리 후 pygame 종료
+        for key in ("leds", "buttons"):
+            dev = self.hw.get(key)
+            if dev is not None and hasattr(dev, "close"):
+                try:
+                    dev.close()
+                except Exception:
+                    pass
         pygame.quit()

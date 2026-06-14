@@ -72,6 +72,10 @@ PIN_BUZZER = 18
 ADC_CHANNEL_X = 0
 ADC_CHANNEL_Y = 1
 PIN_JOYSTICK_BUTTON = 25    # 조이스틱 누름 버튼 (선택)
+# 두더지 잡기용 LED·버튼 (BCM). 사용 중 핀(I2C 2·3, 부저 18, 초음파 23·24, 조이스틱 25,
+# SPI 7~11)과 겹치지 않게 배치. 위치(왼/가운데/오른쪽)는 버튼 ←↓→에 대응한다.
+PIN_LEDS = [5, 6, 13]       # 두더지 구멍 LED 3개 (각 220~330Ω 저항 → LED → GND)
+PIN_BUTTONS = [16, 20, 21]  # 두더지 버튼 3개 (버튼 → GND, 내부 풀업 사용)
 
 # ── 입력 ─────────────────────────────────────────────
 JOYSTICK_DEADZONE = 0.35    # 이 값 미만의 기울기는 무시 (정규화 -1.0~1.0)
@@ -136,6 +140,20 @@ COLOR_HUNT_TARGETS = [
     ("파랑", (100, 120, 70), (130, 255, 255)),
     ("노랑", (20, 120, 120), (35, 255, 255)),
 ]
+
+# ── 두더지 잡기 (LED 3 + 버튼 3, 반응 게임) ───────────
+WHACK_DURATION_S = 30          # 제한 시간(초) — 시간제
+WHACK_TIMEOUT_START_S = 1.2    # 두더지 1마리 생존 시간(시작) → 점점 짧아짐
+WHACK_TIMEOUT_END_S = 0.5      # 두더지 생존 시간(종료 시점)
+WHACK_SPAWN_START_S = 0.9      # 다음 두더지 등장 간격(시작)
+WHACK_SPAWN_END_S = 0.45       # 등장 간격(종료 시점)
+WHACK_DOUBLE_AFTER_S = 15      # 이 시점 이후 동시 2마리 등장 허용(고난도)
+WHACK_TRAP_AFTER_S = 8         # 함정(누르면 안 되는 LED) 등장 시작 시점
+WHACK_TRAP_CHANCE = 0.22       # 등장 시 함정일 확률
+WHACK_HIT_REWARD = 1           # 명중 1회당 재화(점수)
+WHACK_COMBO_STEP = 5           # 콤보 이 단위마다 보너스 1칸 증가
+WHACK_COMBO_BONUS = 1          # 콤보 보너스 칸당 추가 재화
+WHACK_TRAP_PENALTY = 2         # 함정을 눌렀을 때 차감 재화(0 미만으로는 안 내려감)
 
 # ── 상점 품목 (카테고리/가격/효과) ───────────────────
 # effect: 캐릭터 능력치/상태에 더해질 값(dict). costume은 외형 키만 부여.

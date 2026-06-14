@@ -25,6 +25,8 @@
 | 초음파 HC-SR04 | TRIG | GPIO23 (핀 16) | `PIN_ULTRASONIC_TRIG = 23` |
 | | ECHO | GPIO24 (핀 18) ※분압 | `PIN_ULTRASONIC_ECHO = 24` |
 | 부저(피에조) | 신호 | GPIO18 (핀 12, PWM) | `PIN_BUZZER = 18` |
+| 두더지 LED ×3 | 신호 | GPIO5·6·13 (핀 29·31·33) → 220~330Ω → LED → GND | `PIN_LEDS = [5, 6, 13]` |
+| 두더지 버튼 ×3 | 신호 | GPIO16·20·21 (핀 36·38·40) → 버튼 → GND | `PIN_BUTTONS = [16, 20, 21]` |
 | 카메라 | CSI | 전용 CSI 커넥터 | — |
 
 전원: 각 모듈 VCC는 3.3V 또는 5V(모듈 사양 확인), GND는 공통 접지.
@@ -55,6 +57,18 @@ Pi에는 ADC가 없어 SPI ADC가 필요합니다. MCP3008 VDD/VREF=3.3V, AGND/D
 서로 다른 버스라 충돌하지 않습니다. 디스플레이를 SPI 모델(SSD1351/ST7789)로
 바꾸는 경우 `hardware/display.py`의 드라이버/인터페이스를 교체하세요.
 
+### 4. 두더지 잡기 LED·버튼 (반응 미니게임)
+- **LED 3개:** 각 GPIO(5·6·13) → **220~330Ω 저항** → LED(애노드), LED(캐소드) → GND.
+- **버튼 3개:** 각 GPIO(16·20·21) → 버튼 → GND. 코드가 **내부 풀업**(`pull_up=True`)을
+  쓰므로 외부 저항이 필요 없습니다(평소 HIGH, 누르면 LOW).
+- 인덱스 **0·1·2 = 왼·가운데·오른쪽**(버튼 ← ↓ →, PC 키와 동일). LED와 버튼을 같은
+  좌→우 순서로 배치하면 두더지 위치와 직관적으로 맞습니다.
+
+```
+GPIO5 ──[ 220Ω ]──▷|── GND      (LED 0, 가운데/오른쪽도 동일)
+GPIO16 ─────────[버튼]───── GND   (버튼 0, 내부 풀업)
+```
+
 ---
 
 ## 🛠️ 인터페이스 활성화
@@ -84,9 +98,13 @@ import sys; sys.path.insert(0, "src")
 from raspet.hardware.display import create_display
 from raspet.hardware.joystick import create_joystick
 from raspet.hardware.ultrasonic import create_ultrasonic
+from raspet.hardware.leds import create_leds
+from raspet.hardware.buttons import create_buttons
 print("OLED   :", create_display().available)
 print("조이스틱:", create_joystick().available)
 print("초음파  :", create_ultrasonic().available)
+print("LED    :", create_leds().available)
+print("버튼    :", create_buttons().available)
 PY
 ```
 

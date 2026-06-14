@@ -16,6 +16,7 @@ from ..minigames.rps import RockPaperScissors
 from ..minigames.snake import Snake
 from ..minigames.jump import UltrasonicJump
 from ..minigames.color_hunt import ColorHunt
+from ..minigames.whack_a_mole import WhackAMole
 
 
 class AbortGame(Exception):
@@ -345,7 +346,8 @@ class CareScene(Scene):
 
 # ── 미니게임 선택 씬 ─────────────────────────────────────
 class MiniGameMenuScene(Scene):
-    _GAMES = ["오목", "가위바위보", "스네이크", "초음파 점프", "색깔 찾기", "뒤로"]
+    _GAMES = ["오목", "가위바위보", "스네이크", "초음파 점프", "색깔 찾기",
+              "두더지 잡기", "뒤로"]
 
     def __init__(self) -> None:
         self.menu = Menu(self._GAMES)
@@ -543,6 +545,8 @@ def run_minigame(name: str, ctx, difficulty: str = "normal") -> int:
             return UltrasonicJump(ctx=ctx).play()
         if name == "색깔 찾기":
             return ColorHunt(ctx=ctx).play()
+        if name == "두더지 잡기":
+            return WhackAMole(ctx=ctx).play()
     except AbortGame:
         return 0
     return 0
