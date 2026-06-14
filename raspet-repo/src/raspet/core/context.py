@@ -64,9 +64,6 @@ _KEYMAP = {
     pygame.K_ESCAPE: "b", pygame.K_BACKSPACE: "b", pygame.K_x: "b",
 }
 
-# 물리 버튼 인덱스 → 행동. PC의 ← ↓ → 와 같은 액션으로 들어오게 해 입력 경로를 통일한다
-# (두더지 잡기의 구멍 0·1·2에 대응).
-_BUTTON_ACTIONS = {0: "left", 1: "down", 2: "right"}
 
 
 class GameContext:
@@ -121,6 +118,8 @@ class GameContext:
         self.clock = pygame.time.Clock()
         self._actions: set[str] = set()
         self._prev_dir = "center"   # 조이스틱 엣지 검출용
+        # 물리 버튼(인덱스)→행동 매핑. 평소엔 메뉴(확인/뒤로), 미니게임은 set_button_actions로 전환.
+        self._button_actions = self._menu_button_actions()
 
     # ── 창 관리 ─────────────────────────────────────────
     def _create_window(self, size=None) -> None:
@@ -177,19 +176,46 @@ class GameContext:
                 self._actions.add("a")
             self._prev_dir = d
 
-        # 물리 버튼(있으면): 눌린 순간만 ←↓→ 액션으로 (PC 키와 동일 경로)
+        # 물리 버튼(있으면): 눌린 순간을 현재 매핑(_button_actions)의 행동으로.
+        # 평소엔 확인/뒤로(메뉴), 두더지 잡기 중엔 구멍(left/down/right)으로 바뀐다.
         buttons = self.hw.get("buttons")
         if buttons is not None and getattr(buttons, "available", False):
             for idx in buttons.pressed_edges():
-                act = _BUTTON_ACTIONS.get(idx)
-                if act:
-                    self._actions.add(act)
+                if 0 <= idx < len(self._button_actions):
+                    act = self._button_actions[idx]
+                    if act:
+                        self._actions.add(act)
 
         return self._actions
 
     @property
     def actions(self) -> set[str]:
         return self._actions
+
+    # ── 버튼 매핑 (상황별) ───────────────────────────────
+    def _menu_button_actions(self) -> list:
+        """색→행동(config.BUTTON_MENU_ACTIONS)을 버튼 인덱스 순서의 리스트로 변환."""
+        colors = config.LED_COLORS
+        out = []
+        for i in range(len(config.PIN_BUTTONS)):
+            color = colors[i] if i < len(colors) else None
+            out.append(config.BUTTON_MENU_ACTIONS.get(color))
+        return out
+
+    def set_button_actions(self, actions) -> None:
+        """버튼 인덱스→행동 매핑을 바꾼다(예: 두더지 잡기용 구멍 매핑)."""
+        self._button_actions = list(actions)
+
+    def use_menu_buttons(self) -> None:
+        """버튼 매핑을 평소(메뉴: 확인/뒤로) 모드로 되돌린다."""
+        self._button_actions = self._menu_button_actions()
+
+    def update_indicator_leds(self) -> None:
+        """평소 화면에서 확인('a')/뒤로('b') 버튼의 LED를 켜 위치를 표시한다."""
+        if not config.BUTTON_LED_INDICATORS:
+            return
+        for i, act in enumerate(self._button_actions):
+            self.led(i, act in ("a", "b"))
 
     def wait_action(self, valid=None) -> str | None:
         """valid 중 하나가 입력될 때까지(또는 종료까지) 기다렸다 반환한다."""

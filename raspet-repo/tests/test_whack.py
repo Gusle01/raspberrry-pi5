@@ -142,9 +142,8 @@ def test_play_headless_returns_int():
     from raspet.core.context import GameContext
     # 모든 버튼을 매 프레임 눌러 등장하는 두더지를 잡는다(20프레임 후 스크립트 소진→종료)
     script = [{"left", "down", "right"}] * 20
+    # ctx.quit()은 pygame.quit()을 호출해 다른 테스트에 영향을 주므로 부르지 않는다
+    # (기존 테스트 관례와 동일 — 헤드리스 컨텍스트는 그대로 둔다).
     ctx = GameContext(hardware={}, headless=True, script=script)
-    try:
-        reward = WhackAMole(ctx=ctx, rng=random.Random(1)).play()
-    finally:
-        ctx.quit()
+    reward = WhackAMole(ctx=ctx, rng=random.Random(1)).play()
     assert isinstance(reward, int) and reward >= 0

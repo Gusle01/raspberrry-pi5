@@ -530,6 +530,7 @@ def play_and_reward(app, return_scene, name, difficulty="normal") -> int:
 
 def run_minigame(name: str, ctx, difficulty: str = "normal") -> int:
     """이름으로 미니게임을 만들어 실행하고 보상을 반환한다."""
+    ctx.leds_off()        # 미니게임 시작 시 표시 LED 끄기(두더지 잡기는 자체 제어)
     try:
         if name == "오목":
             controller = OmokController(ctx)

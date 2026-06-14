@@ -125,13 +125,19 @@ class WhackAMole(MiniGame):
         ctx = self.ctx
         if ctx is None:
             return 0
+        # 두더지 잡기 동안에는 3버튼이 확인/뒤로가 아니라 구멍(0·1·2) 전용이 된다.
+        ctx.set_button_actions(config.BUTTON_GAME_ACTIONS)
+        aborted = False
         try:
             while ctx.running and not self.engine.over:
                 for a in ctx.poll():
-                    if a == "b":
-                        return self._finish()
+                    if a == "b":            # (PC ESC 등) 중단
+                        aborted = True
+                        break
                     if a in ACTION_HOLE:
                         self.engine.whack(ACTION_HOLE[a])
+                if aborted:
+                    break
                 dt = ctx.tick()
                 self.engine.update(dt)
                 self._feedback()
@@ -139,6 +145,7 @@ class WhackAMole(MiniGame):
                 self._frame += 1
         finally:
             ctx.leds_off()
+            ctx.use_menu_buttons()          # 게임오버·메뉴를 위해 버튼을 확인/뒤로로 복귀
         return self._finish()
 
     # ── 출력: 부저 + LED ─────────────────────────────────
