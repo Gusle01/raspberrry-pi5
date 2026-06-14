@@ -15,15 +15,25 @@ USE_DUMMY_HARDWARE = os.environ.get("RASPET_DUMMY", "0") == "1"
 HEADLESS = os.environ.get("RASPET_HEADLESS", "0") == "1"
 
 # ── 디스플레이 ──────────────────────────────────────
-SCREEN_WIDTH = 128
-SCREEN_HEIGHT = 64          # 컬러 디스플레이 사용 시 128 등으로 변경
+# 디자인(가상 캔버스) 해상도 = OLED 실해상도.
+# 모든 씬은 이 크기의 고정 캔버스에만 그린다. 창/OLED 출력은 이 캔버스를
+# 스케일/전송만 할 뿐이므로, 좌표는 항상 GAME_W·GAME_H(=ctx.width·height) 기준으로 쓴다.
+GAME_W = 128
+GAME_H = 64                 # 컬러 디스플레이 사용 시 128 등으로 변경
 FPS = 30
-# 게임은 SCREEN_WIDTH×SCREEN_HEIGHT(=OLED 실해상도)로 그린 뒤,
-# 모니터(HDMI)에서는 아래 배율로 확대해 보여준다. OLED 출력은 이 값과 무관.
-WINDOW_SCALE = 8           # 데스크톱 미리보기 창 확대 배율 (예: 8 → 1024×512)
+
+# 데스크톱 미리보기 초기 창 크기. 창은 자유롭게 리사이즈 가능하며,
+# 캔버스는 창 안에 비율 유지·정수배로 확대(레터박스)되어 표시된다. OLED 출력은 이 값과 무관.
+WINDOW_SCALE = 8           # 초기 창 = 캔버스의 이 배율 (예: 8 → 1024×512)
+WINDOW_W = GAME_W * WINDOW_SCALE   # 1024
+WINDOW_H = GAME_H * WINDOW_SCALE   # 512
 WINDOW_RESIZABLE = True    # 창 크기 조절 허용 (모서리 드래그)
 # 환경변수 RASPET_FULLSCREEN=1 이면 전체화면으로 시작 (게임 중 F11로도 토글)
 FULLSCREEN = os.environ.get("RASPET_FULLSCREEN", "0") == "1"
+
+# 하위 호환 별칭 — 기존 코드/외부 참조가 SCREEN_WIDTH/HEIGHT를 쓸 수 있어 유지한다.
+SCREEN_WIDTH = GAME_W
+SCREEN_HEIGHT = GAME_H
 
 # 색상 팔레트 (RGB) — 흑백 OLED에서는 임계값으로 이진화된다.
 COLOR_BG = (8, 12, 24)
@@ -43,6 +53,7 @@ FONT_CANDIDATES = [
 ]
 FONT_SIZE = 11              # 일반 텍스트 크기
 FONT_SIZE_BIG = 18         # 강조 텍스트 크기
+FONT_SIZE_SMALL = 8        # 메뉴 등 항목이 많은 목록용 (실제 높이 ≈ 12px)
 
 # ── GPIO 핀맵 (BCM 기준, 배선 확정 후 수정) ─────────
 PIN_ULTRASONIC_TRIG = 23

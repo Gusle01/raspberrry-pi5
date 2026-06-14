@@ -81,10 +81,13 @@ class GameContext:
         self._script = list(script) if script is not None else None
         self.running = True
 
-        self.width = config.SCREEN_WIDTH
-        self.height = config.SCREEN_HEIGHT
+        # 고정 가상 캔버스 크기(= OLED 실해상도). 모든 씬은 이 크기에만 그린다.
+        self.width = config.GAME_W
+        self.height = config.GAME_H
 
         pygame.init()
+        # 게임 한 프레임이 그려지는 고정 캔버스. 창에는 정수배 레터박스로,
+        # OLED에는 1:1로(_to_pil) 동일하게 출력된다.
         self.surface = pygame.Surface((self.width, self.height))
         self.font_path = resolve_korean_font_path()
         if self.font_path is None:
@@ -93,6 +96,7 @@ class GameContext:
                   file=sys.stderr)
         self.font = load_font(self.font_path, config.FONT_SIZE)
         self.font_big = load_font(self.font_path, config.FONT_SIZE_BIG)
+        self.font_small = load_font(self.font_path, config.FONT_SIZE_SMALL)
 
         self._fullscreen = config.FULLSCREEN
         self.window = None
@@ -105,15 +109,21 @@ class GameContext:
         self._prev_dir = "center"   # 조이스틱 엣지 검출용
 
     # ── 창 관리 ─────────────────────────────────────────
-    def _create_window(self) -> None:
-        """현재 모드(전체화면/창)에 맞게 표시 창을 만든다."""
+    def _create_window(self, size=None) -> None:
+        """현재 모드(전체화면/창)에 맞게 표시 창을 만든다.
+
+        size: 창 모드에서 사용할 (w, h). 생략하면 config.WINDOW_W/H(초기 크기).
+              캔버스보다 작아지지 않도록 최소 GAME_W×GAME_H로 클램프한다.
+        """
         if self._fullscreen:
             self.window = pygame.display.set_mode((0, 0), pygame.FULLSCREEN)
         else:
             flags = pygame.RESIZABLE if config.WINDOW_RESIZABLE else 0
-            self.window = pygame.display.set_mode(
-                (self.width * config.WINDOW_SCALE,
-                 self.height * config.WINDOW_SCALE), flags)
+            if size is None:
+                size = (config.WINDOW_W, config.WINDOW_H)
+            w = max(self.width, int(size[0]))     # 1배 미만으로 줄어들지 않게
+            h = max(self.height, int(size[1]))
+            self.window = pygame.display.set_mode((w, h), flags)
 
     def toggle_fullscreen(self) -> None:
         self._fullscreen = not self._fullscreen
@@ -136,9 +146,8 @@ class GameContext:
             if event.type == pygame.QUIT:
                 self.running = False
             elif event.type == pygame.VIDEORESIZE and not self._fullscreen:
-                self.window = pygame.display.set_mode(
-                    event.size,
-                    pygame.RESIZABLE if config.WINDOW_RESIZABLE else 0)
+                # 최소 크기로 클램프해 창을 다시 만든다(present가 정수배 레터박스로 맞춰줌).
+                self._create_window(event.size)
             elif event.type == pygame.KEYDOWN and event.key == pygame.K_F11:
                 self.toggle_fullscreen()
             elif event.type == pygame.KEYDOWN and event.key in _KEYMAP:
@@ -179,8 +188,8 @@ class GameContext:
     def clear(self, color=config.COLOR_BG) -> None:
         self.surface.fill(color)
 
-    def text(self, s, x, y, color=config.COLOR_FG, big=False, center=False) -> None:
-        font = self.font_big if big else self.font
+    def text(self, s, x, y, color=config.COLOR_FG, big=False, center=False, small=False) -> None:
+        font = self.font_big if big else (self.font_small if small else self.font)
         img = font.render(str(s), True, color)
         if center:
             rect = img.get_rect(center=(x, y))
@@ -201,13 +210,15 @@ class GameContext:
     def present(self) -> None:
         """그린 프레임을 창과 OLED로 내보낸다.
 
-        창에는 가로세로 비율을 유지한 채 최대한 크게(레터박스) 그려 찌그러짐을 막는다.
+        창에는 캔버스를 비율 유지·**정수배**로 확대(레터박스)해 픽셀아트가 또렷하게
+        보이도록 하고, 남는 영역은 검은 띠로 채운다. OLED에는 캔버스를 1:1로 보낸다.
         """
         if self.window is not None:
             win_w, win_h = self.window.get_size()
-            scale = min(win_w / self.width, win_h / self.height)
-            sw, sh = int(self.width * scale), int(self.height * scale)
-            scaled = pygame.transform.scale(self.surface, (sw, sh))
+            # 창 안에 들어가는 최대 정수배(최소 1배). 정수배라 픽셀이 흐려지지 않는다.
+            scale = max(1, min(win_w // self.width, win_h // self.height))
+            sw, sh = self.width * scale, self.height * scale
+            scaled = pygame.transform.scale(self.surface, (sw, sh))  # 최근접(nearest)
             self.window.fill((0, 0, 0))   # 남는 영역(레터박스)은 검정
             self.window.blit(scaled, ((win_w - sw) // 2, (win_h - sh) // 2))
             pygame.display.flip()

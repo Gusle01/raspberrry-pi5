@@ -24,8 +24,8 @@ class Display:
         if _LUMA_AVAILABLE:
             serial = i2c(port=1, address=0x3C)
             self._device = ssd1306(serial,
-                                   width=config.SCREEN_WIDTH,
-                                   height=config.SCREEN_HEIGHT)
+                                   width=config.GAME_W,
+                                   height=config.GAME_H)
 
     @property
     def available(self) -> bool:

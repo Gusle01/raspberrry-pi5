@@ -43,8 +43,8 @@ class GameLoop:
             scene = self.scenes.current
             scene.handle_input(actions, self)
             scene.update(dt, self)
-            scene.render(ctx)
-            ctx.present()
+            scene.render(ctx)        # 씬은 고정 캔버스(GAME_W×GAME_H)에만 그린다
+            ctx.present()            # 캔버스를 창(정수배 레터박스)·OLED(1:1)로 출력 — context가 담당
         self._on_exit()
 
     def _on_exit(self) -> None:

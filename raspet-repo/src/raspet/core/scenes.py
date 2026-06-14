@@ -40,12 +40,39 @@ class Menu:
     def selected(self) -> str:
         return self.items[self.index]
 
-    def render(self, ctx, x=6, y=18, line=11) -> None:
-        for i, item in enumerate(self.items):
+    def render(self, ctx, x=6, y=18, line=None, small=True) -> None:
+        """항목을 세로로 그린다.
+
+        화면(128×64)에 다 안 들어가는 항목 수도 처리한다: 선택 항목이 항상
+        보이도록 스크롤하고, 위/아래에 더 있으면 ▲/▼로 표시한다. 기본은
+        작은 폰트(config.FONT_SIZE_SMALL)를 써서 한 화면에 더 많이 보인다.
+        """
+        font = ctx.font_small if small else ctx.font
+        if line is None:
+            line = font.get_height() + 1   # 줄이 서로 겹치지 않도록 폰트 높이+여백
+
+        n = len(self.items)
+        avail = ctx.height - y
+        visible = max(1, avail // line)
+
+        if n <= visible:
+            start = 0
+        else:
+            # 선택 항목을 화면 중앙 부근에 두되, 끝부분에서는 목록 끝에 맞춘다.
+            start = min(max(0, self.index - visible // 2), n - visible)
+
+        for row, i in enumerate(range(start, min(start + visible, n))):
             sel = (i == self.index)
             color = config.COLOR_ACCENT if sel else config.COLOR_FG
             prefix = "▶" if sel else " "
-            ctx.text(prefix + item, x, y + i * line, color=color)
+            ctx.text(prefix + self.items[i], x, y + row * line, color=color, small=small)
+
+        # 스크롤 표시(가려진 항목이 있을 때만)
+        ind_x = ctx.width - 8
+        if start > 0:
+            ctx.text("▲", ind_x, y, color=config.COLOR_FG, small=small)
+        if start + visible < n:
+            ctx.text("▼", ind_x, y + (visible - 1) * line, color=config.COLOR_FG, small=small)
 
 
 def _wrap(text: str, width: int) -> list[str]:
@@ -187,7 +214,7 @@ class MenuScene(Scene):
         draw_pet(ctx, ch, 26, 30, scale=1.2)
         ctx.text(f"{ch.name} Lv.{ch.stage}", 4, 2, color=config.COLOR_ACCENT)
         ctx.text(f"C:{ch.currency}", 4, ctx.height - 9, color=config.COLOR_WARN)
-        self.menu.render(ctx, x=66, y=8, line=9)
+        self.menu.render(ctx, x=66, y=8)
 
 
 # ── 돌보기(육성) 씬 ──────────────────────────────────────
@@ -233,7 +260,7 @@ class CareScene(Scene):
         _bg(ctx)
         draw_pet(ctx, ch, 100, 18, scale=0.8)
         ctx.text(mood_label(ch), 78, 32, color=config.COLOR_DIM)
-        self.menu.render(ctx, x=2, y=2, line=7)
+        self.menu.render(ctx, x=2, y=2)
         ctx.text(f"포{ch.fullness} 청{ch.cleanliness}", 70, 44,
                  color=config.COLOR_DIM)
         ctx.text(f"행{ch.happiness} 스{ch.stress}", 70, 54,
@@ -270,7 +297,7 @@ class MiniGameMenuScene(Scene):
     def render(self, ctx) -> None:
         _bg(ctx)
         ctx.text("미니게임", 6, 2, color=config.COLOR_ACCENT)
-        self.menu.render(ctx, y=13, line=8)
+        self.menu.render(ctx, y=13)
         if self.last_reward:
             name, reward = self.last_reward
             ctx.text(f"+{reward} ({name})", 6, ctx.height - 9,
@@ -301,7 +328,7 @@ class DifficultyScene(Scene):
     def render(self, ctx) -> None:
         _bg(ctx)
         ctx.text("오목 난이도", 6, 4, color=config.COLOR_ACCENT)
-        self.menu.render(ctx, y=20, line=10)
+        self.menu.render(ctx, y=20)
 
 
 # ── 상점 씬 ──────────────────────────────────────────────
@@ -349,7 +376,7 @@ class ShopScene(Scene):
         ch = ctx.app.character
         _bg(ctx)
         ctx.text(f"상점  C:{ch.currency}", 4, 2, color=config.COLOR_ACCENT)
-        self.menu.render(ctx, x=4, y=13, line=8)
+        self.menu.render(ctx, x=4, y=13)
         if self.msg:
             ctx.text(self.msg, 4, ctx.height - 9, color=config.COLOR_WARN)
 
