@@ -10,7 +10,7 @@ from raspet.character.character import Character
 from raspet.character import mood
 from raspet.core import daytime
 from raspet.hardware.environment import (
-    EnvReading, Environment, DummyEnvironment, create_environment,
+    EnvReading, Environment, DummyEnvironment, create_environment, _DHT11,
 )
 from raspet import config
 
@@ -37,7 +37,7 @@ class _FakeEnv:
 def test_env_reading_defaults_are_none():
     r = EnvReading()
     assert r.light is None and r.temperature_c is None
-    assert r.humidity is None            # BMP180엔 습도가 없다
+    assert r.humidity is None            # 센서 미연결 → 기본값은 모두 None
     assert r.is_dark() is False          # 값이 없으면 어둡다고 보지 않음
 
 
@@ -91,6 +91,48 @@ def test_cold_when_chilly():
 
 def test_comfortable_temp_is_neutral():
     assert _m(_ch(), temperature_c=22.0, asleep=False) == "neutral"
+
+
+def test_humid_when_sticky():
+    assert _m(_ch(), humidity=config.HUMID_HIGH_ABOVE, asleep=False) == "humid"
+
+
+def test_missing_humidity_does_not_trigger_humid():
+    assert _m(_ch(), humidity=None, asleep=False) == "neutral"
+    assert _m(_ch(), humidity=40, asleep=False) == "neutral"
+
+
+# ── DHT11 디코더 (하드웨어 없이 비트 디코딩만 검증) ──────────
+def _dht_frame(humidity: int, temp: int):
+    """DHT11 한 프레임을 (levels, counts)로 합성한다(체크섬 포함).
+
+    각 비트는 50µs LOW + HIGH(짧으면 0·길면 1)로 표현된다. 절대 길이 대신
+    상대 길이만 의미가 있으므로 count는 작은 정수로 흉내낸다.
+    """
+    data = [humidity, 0, temp, 0]
+    data.append(sum(data) & 0xFF)
+    levels, counts = [1], [3]                 # 센서 응답 HIGH(핸드셰이크)
+    for byte in data:
+        for i in range(8):
+            bit = (byte >> (7 - i)) & 1
+            levels += [0, 1]
+            counts += [2, 6 if bit else 2]    # LOW, HIGH(1이면 길게)
+    return levels, counts
+
+
+def test_dht11_decode_roundtrip():
+    temp, hum = _DHT11._decode(*_dht_frame(humidity=55, temp=23))
+    assert (temp, hum) == (23.0, 55.0)
+
+
+def test_dht11_decode_rejects_bad_checksum():
+    levels, counts = _dht_frame(humidity=55, temp=23)
+    counts[-1] = 6 if counts[-1] == 2 else 2   # 마지막 비트(체크섬) 한 개 뒤집기
+    try:
+        _DHT11._decode(levels, counts)
+        assert False, "체크섬 오류를 잡지 못했다"
+    except RuntimeError:
+        pass
 
 
 def test_missing_temperature_does_not_trigger_hot_cold():
