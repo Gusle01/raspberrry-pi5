@@ -220,6 +220,23 @@ def _draw_level_hud(ctx, ch) -> None:
         ctx.rect(bar_x, bar_y, fill_w, bar_h, config.COLOR_ACCENT, fill=True)
 
 
+def _draw_temperature(ctx, x, y) -> None:
+    """현재 주변 온도(℃)를 작은 글씨로 그린다. 센서(BMP180)가 없으면 아무것도 안 한다.
+
+    쾌적 범위를 벗어나면 색으로 더위(빨강)/추위(파랑)를 함께 알려준다.
+    """
+    temp = ctx.environment().temperature_c
+    if temp is None:
+        return
+    if temp >= config.TEMP_HOT_ABOVE_C:
+        color = config.COLOR_WARN          # 더움
+    elif temp <= config.TEMP_COLD_BELOW_C:
+        color = config.COLOR_ACCENT        # 추움(차가운 느낌)
+    else:
+        color = config.COLOR_FG            # 쾌적
+    ctx.text(f"{temp:.0f}°C", x, y, color=color, small=True)
+
+
 # ── 타이틀 씬 ────────────────────────────────────────────
 class TitleScene(Scene):
     def __init__(self) -> None:
@@ -286,6 +303,8 @@ class MenuScene(Scene):
         #  XP 레벨 전용으로 두고 여기선 표기하지 않는다 → 'Lv' 중복 제거)
         ctx.text(ch.name, 4, 2, color=config.COLOR_ACCENT, small=True)
         ctx.text(f"C:{ch.currency}", 40, 2, color=config.COLOR_WARN, small=True)
+        # 환경: 현재 온도(BMP180). 센서가 없으면 표시하지 않는다. 펫 오른쪽·메뉴 왼쪽 빈칸.
+        _draw_temperature(ctx, x=40, y=13)
         # 우측 컬럼 전체 높이를 써서 6개 항목을 모두 표시(잘림/스크롤 없음).
         self.menu.render(ctx, x=66, y=2)
         # 하단: 레벨 + XP 진행 바 (높이 기준 앵커 → 절대 안 잘림)
