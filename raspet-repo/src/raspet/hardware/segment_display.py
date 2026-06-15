@@ -22,6 +22,7 @@ try:  # Pi 5 권장 백엔드. 멀티플렉싱은 빠른 비트뱅이 필요해 
     import lgpio
     _LG_AVAILABLE = True
 except Exception:
+    lgpio = None        # 미설치(PC·CI) 환경에서도 모듈 속성은 존재하게 둔다(더미 폴백/테스트용).
     _LG_AVAILABLE = False
 
 
