@@ -234,7 +234,7 @@ def _draw_temperature(ctx, x, y) -> None:
         color = config.COLOR_ACCENT        # 추움(차가운 느낌)
     else:
         color = config.COLOR_FG            # 쾌적
-    ctx.text(f"{temp:.0f}°C", x, y, color=color, small=True)
+    ctx.text(f"{temp:.1f}°C", x, y, color=color, small=True)
 
 
 # ── 타이틀 씬 ────────────────────────────────────────────
