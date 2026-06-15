@@ -44,7 +44,9 @@ class Keypad:
             row.off()                         # 이 행만 LOW
             for c, col in enumerate(self._cols):
                 try:
-                    if not col.value:         # 풀업이라 눌리면 0
+                    # DigitalInputDevice(pull_up=True)는 active-low → 핀이 LOW일 때 value=1.
+                    # 키가 눌리면 이 열이 LOW로 내려간 행과 연결돼 LOW가 되므로 value=1.
+                    if col.value:
                         pressed.add((r, c))
                 except Exception:
                     pass
