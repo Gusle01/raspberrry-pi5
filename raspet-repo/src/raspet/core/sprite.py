@@ -155,21 +155,28 @@ def _face_asleep(ctx, g) -> None:
 
 
 def _face_hot(ctx, g) -> None:
-    # 더위: 축 처진 눈 + 혀 내민 입 + 땀방울
+    # 더위: 축 처진 눈 + 혀 내민 입 + 흘러내리는 땀방울들
     _eyes_dots(ctx, g, dy=1)
     ctx.circle(g.cx, g.mouth_y + 1, max(1, int(g.r * 0.16)), _DARK, fill=False)
     ctx.line(g.cx, g.mouth_y, g.cx, g.mouth_y + g.r * 0.35, config.COLOR_WARN)  # 혀
-    ctx.circle(g.lx - g.er * 2, g.eye_y, max(1, int(g.r * 0.12)), config.COLOR_ACCENT)  # 땀
+    # 땀: 왼쪽 관자놀이에서 두 방울 흘러내리고, 오른쪽 볼에도 한 방울.
+    drop = max(1, int(g.r * 0.13))
+    ctx.circle(g.lx - g.er * 2, g.eye_y, drop, config.COLOR_ACCENT)
+    ctx.circle(g.lx - g.er * 2, g.eye_y + g.r * 0.32, max(1, drop - 1), config.COLOR_ACCENT)
+    ctx.circle(g.rx + g.er * 2, g.eye_y + g.r * 0.2, drop, config.COLOR_ACCENT)
 
 
 def _face_cold(ctx, g) -> None:
-    # 추위: 움츠린 눈 + 떨리는 입(지그재그)
+    # 추위: 움츠린 눈 + 떨리는 입(지그재그) + 머리 위로 흩날리는 눈송이
     _eyes_dots(ctx, g)
     w = g.r * 0.3
     y = g.mouth_y
     ctx.line(g.cx - w, y, g.cx - w * 0.33, y - 2, _DARK)
     ctx.line(g.cx - w * 0.33, y - 2, g.cx + w * 0.33, y + 2, _DARK)
     ctx.line(g.cx + w * 0.33, y + 2, g.cx + w, y - 2, _DARK)
+    s = max(1, int(g.r * 0.16))
+    _snowflake(ctx, g.lx, g.cy - g.r * 0.95, s)
+    _snowflake(ctx, g.rx + g.er, g.cy - g.r * 0.78, max(1, s - 1))
 
 
 _FACES = {
@@ -191,3 +198,11 @@ def _smile(ctx, cx, y, r, up=True) -> None:
 def _x_eye(ctx, x, y, er) -> None:
     ctx.line(x - er, y - er, x + er, y + er, _DARK)
     ctx.line(x - er, y + er, x + er, y - er, _DARK)
+
+
+def _snowflake(ctx, x, y, s, color=config.COLOR_FG) -> None:
+    # 작은 6갈래 눈송이(세로 + 두 대각선). 추위 표정의 '눈' 표시.
+    d = s * 0.7
+    ctx.line(x, y - s, x, y + s, color)
+    ctx.line(x - d, y - d, x + d, y + d, color)
+    ctx.line(x - d, y + d, x + d, y - d, color)

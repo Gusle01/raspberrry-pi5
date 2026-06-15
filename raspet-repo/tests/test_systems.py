@@ -110,4 +110,10 @@ def test_sprite_renders_all_stages_and_moods():
         for ch in moods:
             ch.stage = stage
             draw_pet(ctx, ch, 64, 32)      # 예외 없이 그려져야 한다
+    # 온도 표정(더위=땀 / 추위=눈송이)도 모든 단계에서 그려져야 한다.
+    for stage in range(4):
+        for mood in ("hot", "cold"):
+            ch = Character()
+            ch.stage = stage
+            draw_pet(ctx, ch, 64, 32, mood=mood)
     ctx.present()

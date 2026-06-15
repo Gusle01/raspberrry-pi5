@@ -43,6 +43,17 @@ def test_key_label_from_layout():
     assert kp.key_label(9, 9) == ""        # 범위 밖은 빈 문자열
 
 
+def test_menu_actions_match_designated_switches():
+    # 사용자 지정 물리 스위치(S1~S16, 행 우선) → 메뉴 행동이 올바로 매핑되는지.
+    s = lambda n: ((n - 1) // 4, (n - 1) % 4)      # S번호 → (row, col)
+    expected = {16: "right", 15: "down", 14: "left", 11: "up", 4: "a", 1: "b"}
+    for num, action in expected.items():
+        r, c = s(num)
+        label = config.KEYPAD_LAYOUT[r][c]
+        assert config.KEYPAD_MENU_ACTIONS.get(label) == action
+    assert config.KEYPAD_BACK_KEY == config.KEYPAD_LAYOUT[0][0]   # S1 = 뒤로
+
+
 def test_pressed_edges_only_new_presses():
     kp = _FakeKeypad()
     kp.held = {(0, 0)}
@@ -73,7 +84,7 @@ def test_grid_keypad_back_key_aborts():
     g._grid = (4, 4)
     g.engine = WhackEngine(holes=16)
     g._keypad = _FakeKeypad()
-    # 뒤로 키(config.KEYPAD_BACK_KEY='D')의 위치를 찾아 누른다.
+    # 뒤로 키(config.KEYPAD_BACK_KEY, S1='1')의 위치를 찾아 누른다.
     pos = next((r, c) for r in range(4) for c in range(4)
                if config.KEYPAD_LAYOUT[r][c] == config.KEYPAD_BACK_KEY)
     g._keypad.held = {pos}
