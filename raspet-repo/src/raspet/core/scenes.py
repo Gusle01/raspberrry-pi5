@@ -371,6 +371,7 @@ class MiniGameMenuScene(Scene):
     def __init__(self) -> None:
         self.menu = Menu(self._GAMES)
         self.last_reward = None
+        self.last_record = False
 
     def handle_input(self, actions, app) -> None:
         for a in actions:
@@ -394,11 +395,21 @@ class MiniGameMenuScene(Scene):
     def render(self, ctx) -> None:
         _bg(ctx)
         ctx.text("미니게임", 6, 2, color=config.COLOR_ACCENT)
+        # 선택한 게임의 베스트 기록을 우측 상단에 표시(매 항목 이동 시 갱신).
+        sel = self.menu.selected
+        if sel != "뒤로":
+            label = f"최고 {ctx.app.character.best_score(sel)}"
+            w = ctx._font(small=True).size(label)[0]
+            ctx.text(label, ctx.width - w - 2, 3, color=config.COLOR_DIM, small=True)
         self.menu.render(ctx, y=13)
         if self.last_reward:
             name, reward = self.last_reward
-            ctx.text_bottom(f"+{reward} ({name})", 6,
-                            color=config.COLOR_WARN, small=True)
+            text = f"+{reward} ({name})"
+            color = config.COLOR_WARN
+            if self.last_record:
+                text = "신기록! " + text
+                color = config.COLOR_ACCENT
+            ctx.text_bottom(text, 6, color=color, small=True)
 
 
 # ── 오목 난이도 선택 씬 ──────────────────────────────────
@@ -539,8 +550,12 @@ def play_and_reward(app, return_scene, name, difficulty="normal") -> int:
         xp += config.XP_REWARDS["minigame_win"]
         sfx.win(ctx)
     before, after = ch.add_xp(xp)
+    # 베스트 기록: 이번 점수(보상)가 최고를 넘으면 갱신하고 신기록 여부를 메뉴에 전달.
+    is_record = ch.record_score(name, reward)
     if hasattr(return_scene, "last_reward"):
         return_scene.last_reward = (name, reward)
+    if hasattr(return_scene, "last_record"):
+        return_scene.last_record = is_record
     ev = events.maybe_trigger(ch, app.rng)
     _go(app, return_scene, _progress_popups(app, before_event=ev),
         level_up=after if after > before else None)

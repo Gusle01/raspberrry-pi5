@@ -120,11 +120,16 @@ class WhackAMole(MiniGame):
         self.ctx = ctx
         self.engine = WhackEngine(rng=rng)
         self._frame = 0
+        self._best = 0          # 시작 전 베스트 기록(플레이 중·종료 화면 표시용)
 
     def play(self) -> int:
         ctx = self.ctx
         if ctx is None:
             return 0
+        # 시작 전 베스트 기록을 읽어둔다(헤드리스/테스트는 app이 없을 수 있어 안전 접근).
+        ch = getattr(getattr(ctx, "app", None), "character", None)
+        if ch is not None:
+            self._best = ch.best_score(self.name)
         # 두더지 잡기 동안에는 3버튼이 확인/뒤로가 아니라 구멍(0·1·2) 전용이 된다.
         ctx.set_button_actions(config.BUTTON_GAME_ACTIONS)
         aborted = False
@@ -176,8 +181,10 @@ class WhackAMole(MiniGame):
         # 남은 시간 막대(상단)
         ratio = max(0.0, 1.0 - e._progress())
         ctx.rect(0, 0, int(ctx.width * ratio), 3, config.COLOR_ACCENT)
-        # 점수 · 콤보
+        # 점수 · 콤보 · 베스트
         ctx.text(f"{e.coins}", 2, 6, color=config.COLOR_WARN, small=True)
+        ctx.text(f"최고 {self._best}", ctx.width // 2, 8,
+                 color=config.COLOR_DIM, small=True, center=True)
         if e.combo >= 2:
             ctx.text(f"x{e.combo}", ctx.width - 22, 6,
                      color=config.COLOR_ACCENT, small=True)
@@ -210,10 +217,14 @@ class WhackAMole(MiniGame):
         ctx = self.ctx
         e = self.engine
         ctx.clear()
-        ctx.text("끝!", ctx.width // 2, 14, big=True, center=True)
-        ctx.text(f"점수 {e.coins}  최고콤보 {e.max_combo}", ctx.width // 2, 34,
+        new_record = e.coins > self._best
+        title = "신기록!" if new_record else "끝!"
+        color = config.COLOR_ACCENT if new_record else config.COLOR_FG
+        ctx.text(title, ctx.width // 2, 12, big=True, center=True, color=color)
+        best_now = max(self._best, e.coins)
+        ctx.text(f"점수 {e.coins}  최고 {best_now}", ctx.width // 2, 30,
                  center=True, small=True)
-        ctx.text(f"명중 {e.hits}  놓침 {e.misses}", ctx.width // 2, 48,
+        ctx.text(f"콤보 {e.max_combo}  명중 {e.hits}  놓침 {e.misses}", ctx.width // 2, 44,
                  center=True, small=True)
         ctx.present()
         ctx.wait_action({"a", "b"})

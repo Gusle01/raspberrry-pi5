@@ -55,3 +55,21 @@ def test_serialize_roundtrip():
 def test_from_dict_ignores_unknown_keys():
     ch = Character.from_dict({"name": "X", "intellect": 5, "garbage": 1})
     assert ch.name == "X" and ch.intellect == 5
+
+
+def test_best_score_records_only_improvements():
+    ch = Character()
+    assert ch.best_score("두더지 잡기") == 0
+    assert ch.record_score("두더지 잡기", 12) is True      # 첫 기록 → 신기록
+    assert ch.best_score("두더지 잡기") == 12
+    assert ch.record_score("두더지 잡기", 8) is False      # 더 낮음 → 갱신 안 함
+    assert ch.best_score("두더지 잡기") == 12
+    assert ch.record_score("두더지 잡기", 20) is True      # 더 높음 → 갱신
+    assert ch.best_score("두더지 잡기") == 20
+
+
+def test_best_scores_survive_roundtrip():
+    ch = Character()
+    ch.record_score("스네이크", 30)
+    restored = Character.from_dict(ch.to_dict())
+    assert restored.best_score("스네이크") == 30

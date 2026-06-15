@@ -42,6 +42,18 @@ class Character:
     games_played: int = 0           # 미니게임 플레이 횟수
     total_earned: int = 0           # 누적 획득 재화
     achievements: list = field(default_factory=list)  # 달성한 업적 id 목록
+    best_scores: dict = field(default_factory=dict)   # 미니게임 이름 → 최고 점수(베스트 기록)
+
+    def best_score(self, game: str) -> int:
+        """해당 미니게임의 최고 점수(없으면 0)."""
+        return int(self.best_scores.get(game, 0))
+
+    def record_score(self, game: str, score: int) -> bool:
+        """점수가 기존 최고 기록을 넘으면 갱신한다. 신기록이면 True."""
+        if score > self.best_score(game):
+            self.best_scores[game] = int(score)
+            return True
+        return False
 
     def grow(self, stat: str, amount: int) -> int:
         """능력치를 올린다 (상한·스트레스 효율 적용). 실제 증가량을 반환한다.
