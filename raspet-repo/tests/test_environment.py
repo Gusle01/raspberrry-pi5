@@ -103,34 +103,49 @@ def test_missing_humidity_does_not_trigger_humid():
 
 
 # ── DHT11 디코더 (하드웨어 없이 비트 디코딩만 검증) ──────────
-def _dht_frame(humidity: int, temp: int):
-    """DHT11 한 프레임을 (levels, counts)로 합성한다(체크섬 포함).
+def _dht_edges(humidity: int, temp: int):
+    """DHT11 한 프레임을 커널 엣지 목록 [(level, tick_ns), …]로 합성한다(체크섬 포함).
 
-    각 비트는 50µs LOW + HIGH(짧으면 0·길면 1)로 표현된다. 절대 길이 대신
-    상대 길이만 의미가 있으므로 count는 작은 정수로 흉내낸다.
+    각 비트 = 50µs LOW + HIGH(약 26µs='0', 70µs='1'). level은 엣지 후의 레벨
+    (1=상승, 0=하강), tick은 나노초 누적 시각이다.
     """
     data = [humidity, 0, temp, 0]
     data.append(sum(data) & 0xFF)
-    levels, counts = [1], [3]                 # 센서 응답 HIGH(핸드셰이크)
+    t = 0
+    edges = [(0, t)]                          # 응답 시작: 하강
+    t += 80_000
+    edges.append((1, t)); t += 80_000         # 응답 HIGH 80µs
     for byte in data:
         for i in range(8):
             bit = (byte >> (7 - i)) & 1
-            levels += [0, 1]
-            counts += [2, 6 if bit else 2]    # LOW, HIGH(1이면 길게)
-    return levels, counts
+            edges.append((0, t)); t += 50_000             # 비트 간 LOW 50µs
+            edges.append((1, t)); t += 70_000 if bit else 26_000  # HIGH 길이=값
+    edges.append((0, t))                      # 마지막 HIGH 닫는 하강
+    return edges
 
 
 def test_dht11_decode_roundtrip():
-    temp, hum = _DHT11._decode(*_dht_frame(humidity=55, temp=23))
+    temp, hum = _DHT11._decode(_dht_edges(humidity=55, temp=23))
     assert (temp, hum) == (23.0, 55.0)
 
 
 def test_dht11_decode_rejects_bad_checksum():
-    levels, counts = _dht_frame(humidity=55, temp=23)
-    counts[-1] = 6 if counts[-1] == 2 else 2   # 마지막 비트(체크섬) 한 개 뒤집기
+    edges = _dht_edges(humidity=55, temp=23)
+    # 마지막 데이터 비트(체크섬 LSB)의 HIGH 길이를 뒤집어 값을 깨뜨린다.
+    lvl, t = edges[-1]
+    edges[-1] = (lvl, t + 44_000)             # 26µs HIGH → 70µs로 늘려 '1'로 만듦
     try:
-        _DHT11._decode(levels, counts)
+        _DHT11._decode(edges)
         assert False, "체크섬 오류를 잡지 못했다"
+    except RuntimeError:
+        pass
+
+
+def test_dht11_decode_rejects_no_response():
+    # 센서 무응답(엣지 거의 없음) → 멈추지 않고 예외로 폴백.
+    try:
+        _DHT11._decode([(1, 0)])
+        assert False, "무응답을 잡지 못했다"
     except RuntimeError:
         pass
 

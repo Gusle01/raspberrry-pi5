@@ -61,7 +61,7 @@ class EnvReading:
 
 
 class _DHT11:
-    """DHT11 온도·습도 센서 드라이버 (lgpio 기반, 외부 의존성 없음).
+    """DHT11 온도·습도 센서 드라이버 (lgpio 커널 엣지캡처, 외부 의존성 없음).
 
     단선(1-wire 방식) 프로토콜을 직접 디코딩한다.
       ① 호스트가 데이터선을 ≥18ms LOW로 끌어 시작을 알린다.
@@ -69,8 +69,10 @@ class _DHT11:
       ③ 각 비트 = 50µs LOW + HIGH(약 26µs='0', 약 70µs='1'). HIGH 길이로 0/1을 가른다.
       ④ 5바이트(습도정수·습도소수·온도정수·온도소수·체크섬), 끝에 체크섬으로 검증.
 
-    사용자 공간 폴링이라 타이밍이 빗나가 체크섬이 틀릴 수 있어, read()는 성공할
-    때까지 retries회 재시도한다. 모두 실패하면 예외를 던져 호출부가 폴백한다.
+    µs급 펄스는 파이썬 폴링으로 못 잡으므로(놓치거나 게임 루프가 멈춤), lgpio
+    alert로 **커널이 엣지 시각을 타임스탬프**하게 한다(파이썬 속도와 무관). 캡처는
+    고정 시간이라 센서가 무응답이어도 절대 멈추지 않는다. read()는 성공할 때까지
+    retries회 재시도하고, 모두 실패하면 예외를 던져 호출부가 폴백한다.
     """
 
     def __init__(self, gpio: int, retries: int = 5) -> None:
@@ -89,55 +91,51 @@ class _DHT11:
         last_err = None
         for _ in range(self._retries):
             try:
-                return self._decode(*self._sample())
-            except Exception as e:   # 체크섬·타이밍 실패 → 잠시 쉬고 재시도
+                return self._decode(self._sample())
+            except Exception as e:   # 무응답·체크섬 실패 → 잠시 쉬고 재시도
                 last_err = e
-                time.sleep(0.05)
+                time.sleep(0.02)
         raise last_err if last_err is not None else RuntimeError("DHT11 읽기 실패")
 
-    def _sample(self) -> tuple[list, list]:
-        """시작 신호를 보낸 뒤 레벨 전환을 폴링해 (levels, counts)를 모은다.
+    def _sample(self) -> list:
+        """시작 신호를 보낸 뒤, 커널이 타임스탬프한 엣지 목록 [(level, tick_ns), …]를 반환.
 
-        절대 시간 대신 '같은 레벨로 머문 샘플 수'를 세므로 폴링 속도에 둔감하다
-        (HIGH 펄스가 길수록 count가 크다 → 그 상대 길이로 0/1을 가른다).
+        파이썬 폴링 대신 lgpio alert로 커널이 엣지를 기록하므로 µs급 펄스도 놓치지
+        않고, 고정 대기(캡처 시간)라 센서가 무응답이어도 멈추지 않는다.
         """
         chip, pin = self._chip, self._gpio
-        lgpio.gpio_claim_output(chip, pin, 0)   # ① ≥18ms LOW
+        edges: list = []
+        lgpio.gpio_claim_output(chip, pin, 0)    # ① ≥18ms LOW 시작 신호
         time.sleep(0.020)
-        lgpio.gpio_claim_input(chip, pin)        # ② 입력 전환 → 센서 응답 수신
-
-        levels, counts = [], []
-        last = lgpio.gpio_read(chip, pin)
-        count = 1
-        transitions = 0
-        guard = 1_000_000                        # 무한루프 방지(센서 무응답 대비)
-        # 응답 2엣지 + 40비트×2엣지 ≈ 82개 전환이면 프레임 끝.
-        while transitions < 82 and guard > 0:
-            guard -= 1
-            v = lgpio.gpio_read(chip, pin)
-            if v == last:
-                count += 1
-            else:
-                levels.append(last)
-                counts.append(count)
-                last, count = v, 1
-                transitions += 1
-        levels.append(last)
-        counts.append(count)
-        return levels, counts
+        # ② 입력+양엣지 캡처로 전환 → 풀업이 라인을 올리면 센서가 응답을 시작한다.
+        lgpio.gpio_claim_alert(chip, pin, lgpio.BOTH_EDGES)
+        cb = lgpio.callback(chip, pin, lgpio.BOTH_EDGES,
+                            lambda c, g, level, tick: edges.append((level, tick)))
+        try:
+            time.sleep(0.01)                     # 응답+40비트 ≈ 4ms → 넉넉히 10ms
+        finally:
+            cb.cancel()
+            lgpio.gpio_free(chip, pin)
+        return edges
 
     @staticmethod
-    def _decode(levels: list, counts: list) -> tuple[float, float]:
-        """수집한 레벨/길이에서 40비트를 복원해 (온도℃, 습도%)로 변환한다."""
-        # 데이터는 HIGH 펄스 길이에 실린다. HIGH 구간 길이만 추린다.
-        highs = [c for lv, c in zip(levels, counts) if lv == 1]
+    def _decode(edges: list) -> tuple[float, float]:
+        """엣지 타임스탬프에서 40비트를 복원해 (온도℃, 습도%)로 변환한다."""
+        if len(edges) < 82:                      # 응답 2 + 40비트×2 ≈ 82엣지
+            raise RuntimeError(f"DHT11 무응답/불완전(엣지 {len(edges)}개)")
+        # 데이터는 HIGH 펄스 길이에 실린다. 상승(level=1)→다음 하강(level=0) 간격을 잰다.
+        highs = []
+        for i in range(1, len(edges)):
+            (lvl_prev, t_prev), (lvl, t) = edges[i - 1], edges[i]
+            if lvl_prev == 1 and lvl == 0:
+                highs.append(t - t_prev)
         if len(highs) < 40:
-            raise RuntimeError(f"DHT11: 비트 부족({len(highs)})")
+            raise RuntimeError(f"DHT11 비트 부족({len(highs)})")
         bits = highs[-40:]                       # 마지막 40개가 데이터(앞은 핸드셰이크)
         threshold = (min(bits) + max(bits)) / 2.0
         data = bytearray(5)
-        for i, c in enumerate(bits):
-            if c > threshold:                    # 긴 HIGH = '1'
+        for i, width in enumerate(bits):
+            if width > threshold:                # 긴 HIGH = '1'
                 data[i // 8] |= 1 << (7 - (i % 8))
         if ((data[0] + data[1] + data[2] + data[3]) & 0xFF) != data[4]:
             raise RuntimeError("DHT11 체크섬 불일치")
