@@ -336,6 +336,24 @@ class GameContext:
         if leds is not None:
             leds.all_off()
 
+    # ── 7세그먼트 표시 (메인=온도 / 게임=남은 시간) ──────────
+    def seg_show_temp(self) -> None:
+        """평소 화면용: 현재 주변 온도를 7세그먼트에 표시한다(센서 없으면 소등)."""
+        seg = self.hw.get("segment")
+        if seg is not None:
+            seg.show_temp(self.environment().temperature_c)
+
+    def seg_show_seconds(self, seconds) -> None:
+        """미니게임용: 남은 시간(초)을 7세그먼트에 표시한다."""
+        seg = self.hw.get("segment")
+        if seg is not None:
+            seg.show_seconds(seconds)
+
+    def seg_clear(self) -> None:
+        seg = self.hw.get("segment")
+        if seg is not None:
+            seg.clear()
+
     def distance_cm(self) -> float:
         u = self.hw.get("ultrasonic")
         return u.distance_cm() if u is not None else config.JUMP_DISTANCE_MAX_CM
@@ -399,8 +417,8 @@ class GameContext:
 
     def quit(self) -> None:
         self.close_camera_window()
-        # GPIO 자원(LED·버튼·키패드) 정리 후 pygame 종료
-        for key in ("leds", "buttons", "keypad"):
+        # GPIO 자원(LED·버튼·키패드·7세그먼트) 정리 후 pygame 종료
+        for key in ("leds", "buttons", "keypad", "segment"):
             dev = self.hw.get(key)
             if dev is not None and hasattr(dev, "close"):
                 try:

@@ -170,6 +170,7 @@ class WhackAMole(MiniGame):
                     if a in ACTION_HOLE:
                         self.engine.whack(ACTION_HOLE[a])
             self.engine.update(ctx.tick())
+            ctx.seg_show_seconds(self.engine.duration - self.engine.elapsed)  # 7세그: 남은 시간
             self._feedback(grid_mode)
             if grid_mode:
                 self._render_grid()

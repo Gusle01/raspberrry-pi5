@@ -79,6 +79,7 @@ class ColorHunt(MiniGame):
                      big=True, center=True)
             remain = max(0, int(config.COLOR_HUNT_TIME_LIMIT_S - elapsed))
             ctx.text(f"{remain}s", ctx.width - 16, 2, color=config.COLOR_DIM)
+            ctx.seg_show_seconds(remain)            # 7세그먼트: 남은 시간
             ctx.present()
         self._flash(name, False)
         return False

@@ -21,7 +21,7 @@ numpy>=1.24
 
 # ── 하드웨어 제어 (GPIO / SPI / I2C) ─────────────────
 gpiozero>=2.0           # MCP3008 ADC(조이스틱·조도센서), HC-SR04, 부저 등 지원
-lgpio>=0.2              # Raspberry Pi 5 권장 GPIO 백엔드
+lgpio>=0.2              # Raspberry Pi 5 권장 GPIO 백엔드. 4자리 7세그먼트(74HC595) 멀티플렉싱도 이걸로 직접 제어.
 spidev>=3.6             # MCP3008 SPI 통신
 smbus2>=0.4             # BMP180(온도·기압) I2C 통신. 미설치 시 환경 센서는 자동 폴백.
 # ※ BMP180은 온도+기압만 측정한다(습도 없음). 습도까지 원하면 BME280로 교체 후
