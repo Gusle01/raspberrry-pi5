@@ -22,6 +22,8 @@
 | 조이스틱 | VRx → MCP3008 CH0 | ADC 채널 0 | `ADC_CHANNEL_X = 0` |
 | | VRy → MCP3008 CH1 | ADC 채널 1 | `ADC_CHANNEL_Y = 1` |
 | | SW (버튼) | GPIO25 (핀 22) | `PIN_JOYSTICK_BUTTON = 25` |
+| 조도센서(LDR) | 분압 출력 → MCP3008 CH2 | ADC 채널 2 | `ADC_CHANNEL_LIGHT = 2` |
+| BMP180 (온도·기압, I2C) | SDA/SCL | GPIO2·3 (OLED와 공유) | `BMP180_I2C_ADDR = 0x77` |
 | 초음파 HC-SR04 | TRIG | GPIO23 (핀 16) | `PIN_ULTRASONIC_TRIG = 23` |
 | | ECHO | GPIO24 (핀 18) ※분압 | `PIN_ULTRASONIC_ECHO = 24` |
 | 부저(피에조) | 신호 | GPIO18 (핀 12, PWM) | `PIN_BUZZER = 18` |
@@ -56,6 +58,29 @@ Pi에는 ADC가 없어 SPI ADC가 필요합니다. MCP3008 VDD/VREF=3.3V, AGND/D
 ### 3. OLED는 I2C, MCP3008은 SPI
 서로 다른 버스라 충돌하지 않습니다. 디스플레이를 SPI 모델(SSD1351/ST7789)로
 바꾸는 경우 `hardware/display.py`의 드라이버/인터페이스를 교체하세요.
+
+### 3-1. 조도센서(LDR) — MCP3008 CH2 분압
+LDR은 빛의 세기에 따라 저항이 변합니다. 고정저항(10kΩ 권장)과 직렬로 분압해
+**가운데 지점**을 MCP3008 CH2에 연결합니다.
+
+```
+3.3V ──[ LDR ]──┬── MCP3008 CH2   (밝을수록 값 ↑)
+                │
+             [ 10kΩ ]
+                │
+               GND
+```
+- 위 배선은 **밝을수록 ADC 값이 커집니다.** LDR과 저항 위치를 바꾸면 반대로 읽히는데,
+  그 경우 `config.LIGHT_INVERT = True`로 두면 코드가 값을 뒤집어 줍니다.
+- 어두움/밝음 임계값은 `config.LIGHT_DARK_BELOW`(이하=밤·잠) /
+  `config.LIGHT_LIGHT_ABOVE`(이상=낮·기상)로 조정합니다. 경계 깜빡임을 막는 히스테리시스.
+
+### 3-2. BMP180(온도·기압) — I2C 공유
+OLED와 **같은 I2C 버스**(SDA=GPIO2, SCL=GPIO3)에 병렬로 연결합니다. 주소는 `0x77`이라
+OLED(`0x3C`)와 겹치지 않습니다. VCC는 모듈 사양에 맞춰 3.3V 권장.
+- 연결 확인: `i2cdetect -y 1` → `0x3c`(OLED)와 `0x77`(BMP180)이 함께 보여야 합니다.
+- ⚠️ **BMP180은 습도를 측정하지 못합니다(온도+기압만).** 습도까지 필요하면 핀 호환인
+  **BME280**으로 교체하고 `hardware/environment.py`의 `read()`에서 `humidity`를 채우면 됩니다.
 
 ### 4. LED·버튼 + 조작 매핑
 - **LED 3개:** 각 GPIO(5·6·13) → **220~330Ω 저항** → LED(애노드), LED(캐소드) → GND.

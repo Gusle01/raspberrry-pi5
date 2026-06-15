@@ -69,6 +69,7 @@ class ColorHunt(MiniGame):
                     return False
             elapsed += ctx.tick()
             frame = ctx.capture_frame()
+            ctx.show_camera(frame, label=f"Find: {name}")   # 카메라 화면 별도 창
             if self.detector(frame, target):
                 self._flash(name, True)
                 return True

@@ -145,11 +145,39 @@ def _face_excited(ctx, g) -> None:
     ctx.circle(g.cx, g.mouth_y, max(2, int(g.r * 0.22)), _DARK)
 
 
+def _face_asleep(ctx, g) -> None:
+    # 푹 잠든 표정: 감은 눈(─ ─) + 작은 입 + 큼직한 'Z'들
+    ctx.line(g.lx - g.er, g.eye_y, g.lx + g.er, g.eye_y, _DARK)
+    ctx.line(g.rx - g.er, g.eye_y, g.rx + g.er, g.eye_y, _DARK)
+    ctx.circle(g.cx, g.mouth_y, max(1, int(g.r * 0.1)), _DARK)
+    ctx.text("Z", g.rx + g.er, g.eye_y - g.r * 0.6, color=_DARK, small=True)
+    ctx.text("z", g.rx + g.er * 2, g.eye_y - g.r * 1.1, color=_DARK, small=True)
+
+
+def _face_hot(ctx, g) -> None:
+    # 더위: 축 처진 눈 + 혀 내민 입 + 땀방울
+    _eyes_dots(ctx, g, dy=1)
+    ctx.circle(g.cx, g.mouth_y + 1, max(1, int(g.r * 0.16)), _DARK, fill=False)
+    ctx.line(g.cx, g.mouth_y, g.cx, g.mouth_y + g.r * 0.35, config.COLOR_WARN)  # 혀
+    ctx.circle(g.lx - g.er * 2, g.eye_y, max(1, int(g.r * 0.12)), config.COLOR_ACCENT)  # 땀
+
+
+def _face_cold(ctx, g) -> None:
+    # 추위: 움츠린 눈 + 떨리는 입(지그재그)
+    _eyes_dots(ctx, g)
+    w = g.r * 0.3
+    y = g.mouth_y
+    ctx.line(g.cx - w, y, g.cx - w * 0.33, y - 2, _DARK)
+    ctx.line(g.cx - w * 0.33, y - 2, g.cx + w * 0.33, y + 2, _DARK)
+    ctx.line(g.cx + w * 0.33, y + 2, g.cx + w, y - 2, _DARK)
+
+
 _FACES = {
     "neutral": _face_neutral, "happy": _face_happy, "sad": _face_sad,
     "sick": _face_sick, "hungry": _face_hungry, "stressed": _face_stressed,
     "dirty": _face_dirty, "lonely": _face_lonely, "sleepy": _face_sleepy,
-    "excited": _face_excited,
+    "excited": _face_excited, "asleep": _face_asleep,
+    "hot": _face_hot, "cold": _face_cold,
 }
 
 

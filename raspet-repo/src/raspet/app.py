@@ -14,6 +14,7 @@ from .hardware.ultrasonic import create_ultrasonic
 from .hardware.buzzer import create_buzzer
 from .hardware.leds import create_leds
 from .hardware.buttons import create_buttons
+from .hardware.environment import create_environment
 from .vision.camera import create_camera
 from .vision.hand import create_hand_recognizer
 from .storage import save
@@ -28,6 +29,7 @@ def build_hardware() -> dict:
         "buzzer": create_buzzer(),
         "leds": create_leds(),
         "buttons": create_buttons(),
+        "env": create_environment(),
         "camera": create_camera(),
         "hand": create_hand_recognizer(),
     }

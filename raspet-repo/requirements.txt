@@ -19,10 +19,13 @@ numpy>=1.24
 #                          지장이 없다. 설치를 원하면 따로 시도:  pip install mediapipe
 # picamera2             # ⚠ pip 대신 apt 권장:  sudo apt install -y python3-picamera2
 
-# ── 하드웨어 제어 (GPIO / SPI) ───────────────────────
-gpiozero>=2.0           # MCP3008 ADC, HC-SR04, 부저 등 지원
+# ── 하드웨어 제어 (GPIO / SPI / I2C) ─────────────────
+gpiozero>=2.0           # MCP3008 ADC(조이스틱·조도센서), HC-SR04, 부저 등 지원
 lgpio>=0.2              # Raspberry Pi 5 권장 GPIO 백엔드
 spidev>=3.6             # MCP3008 SPI 통신
+smbus2>=0.4             # BMP180(온도·기압) I2C 통신. 미설치 시 환경 센서는 자동 폴백.
+# ※ BMP180은 온도+기압만 측정한다(습도 없음). 습도까지 원하면 BME280로 교체 후
+#    hardware/environment.py 의 read()에서 humidity를 채우면 된다.
 
 # ── 데이터 저장 ──────────────────────────────────────
 # SQLite는 Python 표준 라이브러리(sqlite3)에 포함되어 별도 설치가 필요 없습니다.

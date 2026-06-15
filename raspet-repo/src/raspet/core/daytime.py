@@ -23,9 +23,25 @@ def period_for_hour(hour: int) -> str:
     return "night"
 
 
-def current_period(now: datetime | None = None) -> str:
+def current_period(now: datetime | None = None, env=None) -> str:
+    """현재 시간대를 반환한다.
+
+    조도센서(env)가 있으면 그것을 우선한다(요청: 밝으면 낮/깸, 어두우면 밤/잠):
+      • 어두움  → 'night'  (펫이 잠든다)
+      • 밝음    → 시계 기반(morning/day/evening) — 단 시계가 밤이어도 밝으면 'day'로 본다.
+    조도센서가 없으면(env=None 또는 미연결) 기존처럼 시스템 시계로만 판정한다.
+
+    Args:
+        now: 기준 시각(테스트 주입용). 생략 시 현재 시각.
+        env: 조도센서를 가진 환경 객체(hardware.environment.Environment). 선택.
+    """
     now = now or datetime.now()
-    return period_for_hour(now.hour)
+    clock = period_for_hour(now.hour)
+    if env is not None and getattr(env, "light_available", False):
+        if env.read().is_dark():
+            return "night"
+        return clock if clock != "night" else "day"   # 밝은데 시계만 밤 → 깨어있음(day)
+    return clock
 
 
 def tint(period: str) -> tuple:

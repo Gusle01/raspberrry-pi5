@@ -9,7 +9,7 @@ from .sprite import draw_pet
 from . import daytime, sfx
 from .. import config, events, achievements
 from ..character import needs
-from ..character.mood import mood_label
+from ..character.mood import mood_label, MOOD_LABELS
 from ..character.endings import determine_ending
 from ..minigames.omok import Omok, HUMAN, AI, EMPTY
 from ..minigames.rps import RockPaperScissors
@@ -99,8 +99,8 @@ def _wrap(text: str, width: int) -> list[str]:
 
 
 def _bg(ctx) -> None:
-    """현재 시간대 색조로 배경을 칠한다."""
-    ctx.clear(daytime.tint(daytime.current_period()))
+    """현재 시간대 색조로 배경을 칠한다(조도센서 우선, 미연결 시 시계)."""
+    ctx.clear(daytime.tint(ctx.current_period()))
 
 
 # ── 팝업 씬 (이벤트·업적 알림 공용) ──────────────────────
@@ -236,7 +236,7 @@ class TitleScene(Scene):
     def render(self, ctx) -> None:
         _bg(ctx)
         ch = ctx.app.character
-        draw_pet(ctx, ch, ctx.width // 2, 24, scale=1.4)
+        draw_pet(ctx, ch, ctx.width // 2, 24, scale=1.4, mood=ctx.current_mood(ch))
         ctx.text("RasPet", ctx.width // 2, 44, color=config.COLOR_ACCENT,
                  big=True, center=True)
         if int(self._t * 2) % 2 == 0:        # 깜빡이는 안내
@@ -280,9 +280,8 @@ class MenuScene(Scene):
 
     def render(self, ctx) -> None:
         ch = ctx.app.character
-        period = daytime.current_period()
-        ctx.clear(daytime.tint(period))
-        draw_pet(ctx, ch, 26, 26, scale=1.2)
+        ctx.clear(daytime.tint(ctx.current_period()))
+        draw_pet(ctx, ch, 26, 26, scale=1.2, mood=ctx.current_mood(ch))
         # 상단: 이름 + 재화. (진화 단계는 펫 외형으로 드러나므로 'Lv.' 텍스트는
         #  XP 레벨 전용으로 두고 여기선 표기하지 않는다 → 'Lv' 중복 제거)
         ctx.text(ch.name, 4, 2, color=config.COLOR_ACCENT, small=True)
@@ -334,8 +333,9 @@ class CareScene(Scene):
     def render(self, ctx) -> None:
         ch = ctx.app.character
         _bg(ctx)
-        draw_pet(ctx, ch, 100, 18, scale=0.8)
-        ctx.text(mood_label(ch), 78, 30, color=config.COLOR_DIM, small=True)
+        mood_id = ctx.current_mood(ch)   # 시간대 + 환경(온도/수면)까지 반영
+        draw_pet(ctx, ch, 100, 18, scale=0.8, mood=mood_id)
+        ctx.text(MOOD_LABELS.get(mood_id, ""), 78, 30, color=config.COLOR_DIM, small=True)
         self.menu.render(ctx, x=2, y=2)
         # 우측 스탯 2줄 — 작은 폰트로 화면 안에 들어오게(y=40,52 → 바닥 64 이내).
         ctx.text(f"포{ch.fullness} 청{ch.cleanliness}", 70, 40,
@@ -550,6 +550,8 @@ def run_minigame(name: str, ctx, difficulty: str = "normal") -> int:
             return WhackAMole(ctx=ctx).play()
     except AbortGame:
         return 0
+    finally:
+        ctx.close_camera_window()    # 카메라 미니게임이 띄운 미리보기 창 정리
     return 0
 
 

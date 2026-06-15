@@ -23,14 +23,26 @@ def _current_period() -> str:
     return daytime.current_period()
 
 
-def _signal(character, period, name):
+_MISSING = object()   # 신호 값이 없음(센서 미연결 등) → 그 규칙은 매칭되지 않는다.
+
+
+def _signal(character, period, env, name):
     if name == "period":
         return period
-    return getattr(character, name)
+    if env is not None and name in env:        # 환경 신호(temperature_c/asleep/light/humidity)
+        return env[name]
+    return getattr(character, name, _MISSING)
 
 
-def compute_mood(character, period: str | None = None) -> str:
-    """캐릭터 상태를 보고 무드 id를 반환한다.
+def _matches(value, op, target) -> bool:
+    """값이 없으면(None/_MISSING) 그 조건은 거짓으로 본다(온도·수면 센서 미연결 대응)."""
+    if value is None or value is _MISSING:
+        return False
+    return _OPS[op](value, target)
+
+
+def compute_mood(character, period: str | None = None, env: dict | None = None) -> str:
+    """캐릭터 상태(+환경)를 보고 무드 id를 반환한다.
 
     config.MOODS를 위에서부터 검사해 모든 조건(AND)을 만족하는 첫 규칙을 채택한다.
     마지막 규칙(neutral)은 빈 조건이라 항상 매칭되므로 기본값 역할을 한다.
@@ -38,15 +50,17 @@ def compute_mood(character, period: str | None = None) -> str:
     Args:
         character: Character 인스턴스
         period: 시간대 문자열. 생략하면 현재 시각으로 계산한다(졸림 판정용).
+        env: 환경 신호 dict(temperature_c/asleep/light/humidity). 값이 None이거나
+             키가 없으면(센서 미연결) 해당 환경 규칙(더위/추위/수면)은 매칭되지 않는다.
     """
     if period is None:
         period = _current_period()
     for rule in config.MOODS:
-        if all(_OPS[op](_signal(character, period, sig), val)
+        if all(_matches(_signal(character, period, env, sig), op, val)
                for sig, op, val in rule["when"]):
             return rule["id"]
     return "neutral"
 
 
-def mood_label(character, period: str | None = None) -> str:
-    return MOOD_LABELS.get(compute_mood(character, period), "")
+def mood_label(character, period: str | None = None, env: dict | None = None) -> str:
+    return MOOD_LABELS.get(compute_mood(character, period, env), "")

@@ -63,14 +63,14 @@ class RockPaperScissors(MiniGame):
     def _interactive_choice(self):
         """손 인식이 가능하면 카메라로, 아니면 버튼으로 선택받는다."""
         ctx = self.ctx
-        hand = ctx.hw.get("hand") if ctx else None
+        if ctx is None:
+            return None
+        hand = ctx.hw.get("hand")
         if hand is not None and getattr(hand, "available", False):
-            gesture = ctx.classify_hand()
+            gesture = self._camera_choice(hand)
             if gesture in CHOICES:
                 return gesture
         # 버튼 선택: 좌=바위, 상=가위, 우=보
-        if ctx is None:
-            return None
         keymap = {"left": "rock", "up": "scissors", "right": "paper"}
         ctx.clear()
         ctx.text("가위바위보!", ctx.width // 2, 8, center=True)
@@ -78,6 +78,33 @@ class RockPaperScissors(MiniGame):
         action = ctx.wait_action(set(keymap) | {"b"})
         if action in keymap:
             return keymap[action]
+        return None
+
+    def _camera_choice(self, hand):
+        """카메라 미리보기 창을 띄운 채 손 모양을 인식해 반환한다.
+
+        제한 시간(RPS_CAMERA_SECONDS) 안에 손이 인식되면 그 제스처를, 시간이 지나면
+        None을 돌려준다(그러면 호출부가 버튼 선택으로 폴백한다). 'b'로 취소 가능.
+        """
+        ctx = self.ctx
+        elapsed = 0.0
+        while ctx.running and elapsed < config.RPS_CAMERA_SECONDS:
+            for a in ctx.poll():
+                if a == "b":
+                    return None
+            elapsed += ctx.tick()
+            frame = ctx.capture_frame()
+            gesture = hand.classify_gesture(frame)
+            ctx.show_camera(frame, label=gesture or "show your hand")
+            ctx.clear()
+            ctx.text("카메라에 손을!", ctx.width // 2, 8, center=True)
+            ctx.text(_LABEL.get(gesture, "..."), ctx.width // 2, 30,
+                     color=config.COLOR_ACCENT, big=True, center=True)
+            remain = max(0, int(config.RPS_CAMERA_SECONDS - elapsed))
+            ctx.text(f"{remain}s", ctx.width - 16, 2, color=config.COLOR_DIM)
+            ctx.present()
+            if gesture in CHOICES:
+                return gesture
         return None
 
     def _show_round(self, rnd, user, com, result):

@@ -120,6 +120,11 @@ class GameContext:
         self._prev_dir = "center"   # 조이스틱 엣지 검출용
         # 물리 버튼(인덱스)→행동 매핑. 평소엔 메뉴(확인/뒤로), 미니게임은 set_button_actions로 전환.
         self._button_actions = self._menu_button_actions()
+        # 환경 센서 스냅샷 캐시 — 매 프레임 I2C/ADC를 다시 읽지 않도록 폴링 주기로 제한한다.
+        self._env_reading = None
+        self._env_last_ms = -10 ** 9
+        # 카메라 미리보기 창 — 카메라 미니게임에서 처음 쓸 때 lazy 생성한다.
+        self._camera_preview = None
 
     # ── 창 관리 ─────────────────────────────────────────
     def _create_window(self, size=None) -> None:
@@ -328,7 +333,55 @@ class GameContext:
             return None
         return hand.classify_gesture(self.capture_frame())
 
+    # ── 환경 센서 (조도 + 온도) ──────────────────────────
+    def environment(self):
+        """현재 환경 스냅샷(EnvReading)을 반환한다. ENV_POLL_MS 주기로만 실제로 읽는다.
+
+        센서가 없으면 모든 값이 None인 빈 스냅샷이 돌아온다(폴백).
+        """
+        env = self.hw.get("env")
+        now_ms = pygame.time.get_ticks()
+        if (self._env_reading is None
+                or now_ms - self._env_last_ms >= config.ENV_POLL_MS):
+            if env is not None:
+                self._env_reading = env.read()
+            else:
+                from ..hardware.environment import EnvReading
+                self._env_reading = EnvReading()
+            self._env_last_ms = now_ms
+        return self._env_reading
+
+    def current_period(self) -> str:
+        """조도센서 우선(밝음=낮/어두움=밤), 미연결 시 시계 기반 시간대."""
+        from . import daytime
+        return daytime.current_period(env=self.hw.get("env"))
+
+    def mood_env(self) -> dict:
+        """compute_mood에 넘길 환경 신호(온도/수면/조도/습도) 묶음."""
+        return self.environment().mood_signals()
+
+    def current_mood(self, character) -> str:
+        """캐릭터 상태 + 시간대 + 환경(온도/수면)을 모두 반영한 무드 id."""
+        from ..character.mood import compute_mood
+        return compute_mood(character, period=self.current_period(), env=self.mood_env())
+
+    # ── 카메라 미리보기 창 ───────────────────────────────
+    def show_camera(self, frame, label=None) -> None:
+        """카메라 프레임을 별도 창에 표시한다(카메라 미니게임용). 헤드리스면 무시."""
+        if self.headless or not config.CAMERA_PREVIEW:
+            return
+        if self._camera_preview is None:
+            from ..vision.preview import CameraPreview
+            self._camera_preview = CameraPreview()
+        self._camera_preview.show(frame, label=label)
+
+    def close_camera_window(self) -> None:
+        """카메라 미리보기 창을 닫는다(미니게임 종료 시)."""
+        if self._camera_preview is not None:
+            self._camera_preview.close()
+
     def quit(self) -> None:
+        self.close_camera_window()
         # GPIO 자원(LED·버튼) 정리 후 pygame 종료
         for key in ("leds", "buttons"):
             dev = self.hw.get(key)
