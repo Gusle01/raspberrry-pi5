@@ -62,3 +62,60 @@ def test_indicator_leds_light_confirm_and_back():
     assert fl.state.get(0) is True     # 초록=확인 → 켜짐
     assert fl.state.get(1) is True     # 빨강=뒤로 → 켜짐
     assert fl.state.get(2) is False    # 노랑=이동 → 꺼짐
+
+
+# ── 4번째 LED(파랑) + 온도/색깔찾기 색 표시 ──────────────
+class _FakeEnv:
+    def __init__(self, temp):
+        self._t = temp
+
+    def read(self):
+        from raspet.hardware.environment import EnvReading
+        return EnvReading(temperature_c=self._t)
+
+
+def _ctx_temp(temp, leds=None):
+    hw = {"env": _FakeEnv(temp)}
+    if leds is not None:
+        hw["leds"] = leds
+    return GameContext(hardware=hw, headless=True)
+
+
+def test_led_config_has_four_colors():
+    assert len(config.PIN_LEDS) == len(config.LED_COLORS) == 4
+    assert "blue" in config.LED_COLORS
+    # 색깔 찾기 타깃이 모두 실제 LED 색으로 매핑되는지
+    for name, *_ in config.COLOR_HUNT_TARGETS:
+        assert config.COLOR_HUNT_LED.get(name) in config.LED_COLORS
+
+
+def test_temp_led_color_thresholds():
+    assert _ctx_temp(30).temp_led_color() == config.TEMP_LED_HOT     # 더움
+    assert _ctx_temp(20).temp_led_color() == config.TEMP_LED_OK      # 적당
+    assert _ctx_temp(5).temp_led_color() == config.TEMP_LED_COLD     # 추움
+    assert _ctx_temp(None).temp_led_color() is None                  # 센서 없음
+
+
+def test_update_temp_led_lights_only_that_color():
+    fl = _FakeLeds()
+    _ctx_temp(30, leds=fl).update_temp_led()                # 더움 → 빨강만
+    red_i = config.LED_COLORS.index("red")
+    assert fl.state.get(red_i) is True
+    assert all(v is False for k, v in fl.state.items() if k != red_i)
+
+
+def test_update_temp_led_off_without_sensor():
+    fl = _FakeLeds()
+    _ctx_temp(None, leds=fl).update_temp_led()
+    assert all(v is False for v in fl.state.values())
+
+
+def test_set_color_led_lights_only_named():
+    fl = _FakeLeds()
+    ctx = GameContext(hardware={"leds": fl}, headless=True)
+    ctx.set_color_led("blue")
+    blue_i = config.LED_COLORS.index("blue")
+    assert fl.state.get(blue_i) is True
+    assert all(v is False for k, v in fl.state.items() if k != blue_i)
+    ctx.set_color_led(None)                                 # 전부 끔
+    assert all(v is False for v in fl.state.values())

@@ -45,8 +45,8 @@ class GameLoop:
             scene.update(dt, self)
             scene.render(ctx)        # 씬은 고정 캔버스(GAME_W×GAME_H)에만 그린다
             ctx.present()            # 캔버스를 창(정수배 레터박스)·OLED(1:1)로 출력 — context가 담당
-            ctx.update_indicator_leds()   # 평소 화면: 확인/뒤로 버튼 LED 표시(미니게임은 자체 제어)
-            ctx.seg_show_temp()      # 7세그먼트: 평소엔 온도(미니게임은 자체 루프에서 남은 시간으로 덮어씀)
+            ctx.update_temp_led()    # 평소 화면: 온도를 LED 색으로(더움=빨강·적당=초록·추움=파랑)
+            ctx.seg_show_temp()      # 7세그먼트(켜져 있으면): 평소엔 온도(미니게임은 남은 시간으로 덮어씀)
         self._on_exit()
 
     def _on_exit(self) -> None:

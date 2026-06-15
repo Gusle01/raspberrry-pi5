@@ -336,6 +336,29 @@ class GameContext:
         if leds is not None:
             leds.all_off()
 
+    def set_color_led(self, color) -> None:
+        """지정한 색 이름(LED_COLORS 중)의 LED만 켜고 나머지는 끈다. color=None이면 전부 끔."""
+        leds = self.hw.get("leds")
+        if leds is None:
+            return
+        for i, c in enumerate(config.LED_COLORS):
+            leds.set(i, c == color)
+
+    def temp_led_color(self):
+        """현재 온도에 대응하는 LED 색 이름(더움=빨강·적당=초록·추움=파랑). 센서 없으면 None."""
+        temp = self.environment().temperature_c
+        if temp is None:
+            return None
+        if temp >= config.TEMP_HOT_ABOVE_C:
+            return config.TEMP_LED_HOT
+        if temp <= config.TEMP_COLD_BELOW_C:
+            return config.TEMP_LED_COLD
+        return config.TEMP_LED_OK
+
+    def update_temp_led(self) -> None:
+        """평소 화면: 주변 온도를 색으로 표시한다(얼굴 표정과 짝). 센서 없으면 소등."""
+        self.set_color_led(self.temp_led_color())
+
     # ── 7세그먼트 표시 (메인=온도 / 게임=남은 시간) ──────────
     def seg_show_temp(self) -> None:
         """평소 화면용: 현재 주변 온도를 7세그먼트에 표시한다(센서 없으면 소등)."""

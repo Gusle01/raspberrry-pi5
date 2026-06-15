@@ -74,18 +74,24 @@ ADC_CHANNEL_Y = 1
 PIN_JOYSTICK_BUTTON = 25    # 조이스틱 누름 버튼 (선택)
 # 두더지 잡기용 LED·버튼 (BCM). 사용 중 핀(I2C 2·3, 부저 18, 초음파 23·24, 조이스틱 25,
 # SPI 7~11)과 겹치지 않게 배치. 위치(왼/가운데/오른쪽)는 버튼 ←↓→에 대응한다.
-PIN_LEDS = [5, 6, 13]       # 두더지 구멍 LED 3개 (각 220~330Ω 저항 → LED → GND)
+PIN_LEDS = [5, 6, 13, 19]   # LED 4개 (각 220~330Ω 저항 → LED → GND). 5·6·13=기존 3구멍,
+                            # 19=파랑(추가, 예전 DHT11 자리). 메인화면 온도색·색깔찾기 힌트에 쓴다.
 PIN_BUTTONS = [16, 20, 21]  # 두더지 버튼 3개 (버튼 → GND, 내부 풀업 사용)
-# LED와 버튼은 같은 인덱스(0·1·2)끼리 한 쌍으로 본다. 각 자리에 실제로 꽂은 LED 색을
-# 적어두고(배선에 맞게 수정), 이 색으로 버튼 기능을 지정한다(BUTTON_MENU_ACTIONS).
-LED_COLORS = ["green", "red", "yellow"]   # PIN_LEDS/PIN_BUTTONS 자리의 LED 색
+# LED와 버튼은 같은 인덱스(0·1·2)끼리 한 쌍으로 본다(4번째 파랑 LED는 버튼 짝 없음). 각 자리에
+# 실제로 꽂은 LED 색을 적어두고(배선에 맞게 수정), 이 색으로 버튼 기능을 지정한다(BUTTON_MENU_ACTIONS).
+LED_COLORS = ["green", "red", "yellow", "blue"]   # PIN_LEDS 자리의 LED 색
+# 온도 → LED 색(메인 화면). 얼굴 표정과 함께 색으로도 더위/추위를 알린다(센서 없으면 소등).
+TEMP_LED_HOT = "red"        # TEMP_HOT_ABOVE_C 이상 → 빨강
+TEMP_LED_OK = "green"       # 쾌적 범위 → 초록
+TEMP_LED_COLD = "blue"      # TEMP_COLD_BELOW_C 이하 → 파랑
 
 # ── 4자리 7세그먼트 LED (74HC595 + 자릿수 멀티플렉싱) ─────
-# 메인 화면=주변 온도, 시간제한 게임=남은 시간 표시. RASPET_7SEG=0으로 끌 수 있다.
-# ※ 활성화하면 LED 3핀(5·6·13)을 자릿수 공통선으로 재사용하므로(아래) 그땐 LED를
-#   달지 않는다(app.build_hardware가 LED를 더미로 둔다). GPIO4는 1-Wire(w1-gpio)
-#   오버레이를 꺼야 쓸 수 있다(/boot/firmware/config.txt 에서 dtoverlay=w1-gpio 제거).
-SEG_ENABLED = os.environ.get("RASPET_7SEG", "1") == "1"
+# 메인 화면=주변 온도, 시간제한 게임=남은 시간 표시. RASPET_7SEG=1로 켤 수 있다.
+# ※ 기본은 꺼짐(LED 4개를 쓰기 위함). 켜면 LED 핀(5·6·13·19)을 세그먼트/래치로
+#   재사용하므로 그땐 LED를 달지 않는다(app.build_hardware가 LED를 더미로 둔다).
+#   자릿수 GPIO4는 1-Wire(w1-gpio) 오버레이를 꺼야 쓸 수 있다(docs/hardware-wiring.md 3-4 참고).
+#   ※ 7세그는 자릿수 공통선마다 트랜지스터가 필요(과전류) — 없으면 켜지 말 것.
+SEG_ENABLED = os.environ.get("RASPET_7SEG", "0") == "1"
 PIN_7SEG_DATA = 14          # 74HC595 DS(데이터)    — 시리얼 콘솔이 꺼져 있어야 GPIO로 쓸 수 있음
 PIN_7SEG_CLOCK = 15         # 74HC595 SHCP(시프트클럭)
 PIN_7SEG_LATCH = 19         # 74HC595 STCP(래치)
@@ -225,6 +231,8 @@ COLOR_HUNT_TARGETS = [
     ("파랑", (100, 120, 70), (130, 255, 255)),
     ("노랑", (20, 120, 120), (35, 255, 255)),
 ]
+# 타깃 색 이름 → 켤 LED 색(LED_COLORS 중). 흑백 OLED가 못 보여주는 실제 색을 LED로 힌트한다.
+COLOR_HUNT_LED = {"빨강": "red", "초록": "green", "파랑": "blue", "노랑": "yellow"}
 
 # ── 두더지 잡기 (LED 3 + 버튼 3, 반응 게임) ───────────
 WHACK_DURATION_S = 30          # 제한 시간(초) — 시간제

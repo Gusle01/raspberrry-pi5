@@ -56,12 +56,14 @@ class ColorHunt(MiniGame):
                 reward += config.COLOR_HUNT_REWARD_PER_ROUND
             if not ctx.running:
                 break
+        ctx.leds_off()                          # 색 힌트 LED 끄기(메인 루프가 온도색으로 복귀)
         return reward
 
     def _run_round(self, target) -> bool:
         """한 라운드: 제한 시간 안에 목표 색을 비추면 True."""
         ctx = self.ctx
         name = target[0]
+        ctx.set_color_led(config.COLOR_HUNT_LED.get(name))   # 찾을 색을 LED로 힌트(흑백 OLED 보완)
         elapsed = 0.0
         while ctx.running and elapsed < config.COLOR_HUNT_TIME_LIMIT_S:
             for a in ctx.poll():
