@@ -23,7 +23,7 @@
 | | VRy → MCP3008 CH1 | ADC 채널 1 | `ADC_CHANNEL_Y = 1` |
 | | SW (버튼) | GPIO25 (핀 22) | `PIN_JOYSTICK_BUTTON = 25` |
 | 조도센서(LDR) | 분압 출력 → MCP3008 CH2 | ADC 채널 2 | `ADC_CHANNEL_LIGHT = 2` |
-| DHT11 (온도·습도, 단선 디지털) | DATA | GPIO19 (핀 35) | `DHT11_GPIO = 19` |
+| BMP180 (온도·기압, I2C) | SDA/SCL | GPIO2·3 (OLED와 공유) | `BMP180_I2C_ADDR = 0x77` |
 | 초음파 HC-SR04 | TRIG | GPIO23 (핀 16) | `PIN_ULTRASONIC_TRIG = 23` |
 | | ECHO | GPIO24 (핀 18) ※분압 | `PIN_ULTRASONIC_ECHO = 24` |
 | 부저(피에조) | 신호 | GPIO18 (핀 12, PWM) | `PIN_BUZZER = 18` |
@@ -77,17 +77,12 @@ LDR은 빛의 세기에 따라 저항이 변합니다. 고정저항(10kΩ 권장
 - 어두움/밝음 임계값은 `config.LIGHT_DARK_BELOW`(이하=밤·잠) /
   `config.LIGHT_LIGHT_ABOVE`(이상=낮·기상)로 조정합니다. 경계 깜빡임을 막는 히스테리시스.
 
-### 3-2. DHT11(온도·습도) — 단선 디지털
-I2C가 아니라 **데이터선 1개(GPIO19, 물리핀 35)** 만 씁니다.
-- **VCC** → 3.3V 레일, **GND** → (−)레일, **DATA** → GPIO19(핀 35).
-- ⚠️ **4핀(베어) 모듈**이라면 DATA와 VCC 사이에 **풀업 저항 4.7~10kΩ**을 답니다.
-  3핀 브레이크아웃 모듈은 보드에 풀업이 이미 있으니 그대로 연결하면 됩니다.
-- DHT11은 단선 프로토콜이라 `i2cdetect`에 안 보입니다. 동작 확인은 아래 검증 코드로 합니다.
-- ⚠️ **정밀도가 낮습니다**(온도 ±2℃·습도 ±5%, 정수 단위, 초당 1회). 펫 표정 트리거용엔
-  충분하지만, 더 정밀하게 쓰려면 핀 호환인 **DHT22**로 교체하면 코드 변경 없이 됩니다
-  (값 범위만 더 넓어짐). 기압까지 필요하면 BME280(I2C)로 가야 합니다.
-
-> 💡 BMP180에서 바꿨다면 `config.py`의 `DHT11_GPIO`만 실제 배선 핀과 맞추면 됩니다.
+### 3-2. BMP180(온도·기압) — I2C 공유
+OLED와 **같은 I2C 버스**(SDA=GPIO2, SCL=GPIO3)에 병렬로 연결합니다. 주소는 `0x77`이라
+OLED(`0x3C`)와 겹치지 않습니다. VCC는 모듈 사양에 맞춰 3.3V 권장.
+- 연결 확인: `i2cdetect -y 1` → `0x3c`(OLED)와 `0x77`(BMP180)이 함께 보여야 합니다.
+- ⚠️ **BMP180은 습도를 측정하지 못합니다(온도+기압만).** 습도까지 필요하면 핀 호환인
+  **BME280**으로 교체하고 `hardware/environment.py`의 `read()`에서 `humidity`를 채우면 됩니다.
 
 ### 3-3. 4×4 매트릭스 키패드
 행 4개(GPIO26·17·27·22)는 출력, 열 4개(GPIO12·16·20·21)는 입력(내부 풀업)입니다.
@@ -155,20 +150,13 @@ from raspet.hardware.joystick import create_joystick
 from raspet.hardware.ultrasonic import create_ultrasonic
 from raspet.hardware.leds import create_leds
 from raspet.hardware.buttons import create_buttons
-from raspet.hardware.environment import create_environment
 print("OLED   :", create_display().available)
 print("조이스틱:", create_joystick().available)
 print("초음파  :", create_ultrasonic().available)
 print("LED    :", create_leds().available)
 print("버튼    :", create_buttons().available)
-env = create_environment()
-r = env.read()
-print("환경    :", env.available, "온도=", r.temperature_c, "℃  습도=", r.humidity, "%")
 PY
 ```
-
-> DHT11은 가끔 읽기에 실패합니다(드라이버가 재시도하지만 그래도 `None`이 나오면 한 번 더
-> 실행해 보세요). 온도·습도가 숫자로 찍히면 정상입니다.
 
 `available`이 `False`로 나오면 배선·인터페이스 활성화·라이브러리 설치를 점검하세요.
 값이 이상하게 읽히면 `config.py`의 핀 번호부터 확인합니다.

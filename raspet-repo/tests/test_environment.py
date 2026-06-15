@@ -10,7 +10,7 @@ from raspet.character.character import Character
 from raspet.character import mood
 from raspet.core import daytime
 from raspet.hardware.environment import (
-    EnvReading, Environment, DummyEnvironment, create_environment, _DHT11,
+    EnvReading, Environment, DummyEnvironment, create_environment,
 )
 from raspet import config
 
@@ -37,7 +37,7 @@ class _FakeEnv:
 def test_env_reading_defaults_are_none():
     r = EnvReading()
     assert r.light is None and r.temperature_c is None
-    assert r.humidity is None            # 센서 미연결 → 기본값은 모두 None
+    assert r.humidity is None            # BMP180엔 습도가 없다
     assert r.is_dark() is False          # 값이 없으면 어둡다고 보지 않음
 
 
@@ -91,63 +91,6 @@ def test_cold_when_chilly():
 
 def test_comfortable_temp_is_neutral():
     assert _m(_ch(), temperature_c=22.0, asleep=False) == "neutral"
-
-
-def test_humid_when_sticky():
-    assert _m(_ch(), humidity=config.HUMID_HIGH_ABOVE, asleep=False) == "humid"
-
-
-def test_missing_humidity_does_not_trigger_humid():
-    assert _m(_ch(), humidity=None, asleep=False) == "neutral"
-    assert _m(_ch(), humidity=40, asleep=False) == "neutral"
-
-
-# ── DHT11 디코더 (하드웨어 없이 비트 디코딩만 검증) ──────────
-def _dht_edges(humidity: int, temp: int):
-    """DHT11 한 프레임을 커널 엣지 목록 [(level, tick_ns), …]로 합성한다(체크섬 포함).
-
-    각 비트 = 50µs LOW + HIGH(약 26µs='0', 70µs='1'). level은 엣지 후의 레벨
-    (1=상승, 0=하강), tick은 나노초 누적 시각이다.
-    """
-    data = [humidity, 0, temp, 0]
-    data.append(sum(data) & 0xFF)
-    t = 0
-    edges = [(0, t)]                          # 응답 시작: 하강
-    t += 80_000
-    edges.append((1, t)); t += 80_000         # 응답 HIGH 80µs
-    for byte in data:
-        for i in range(8):
-            bit = (byte >> (7 - i)) & 1
-            edges.append((0, t)); t += 50_000             # 비트 간 LOW 50µs
-            edges.append((1, t)); t += 70_000 if bit else 26_000  # HIGH 길이=값
-    edges.append((0, t))                      # 마지막 HIGH 닫는 하강
-    return edges
-
-
-def test_dht11_decode_roundtrip():
-    temp, hum = _DHT11._decode(_dht_edges(humidity=55, temp=23))
-    assert (temp, hum) == (23.0, 55.0)
-
-
-def test_dht11_decode_rejects_bad_checksum():
-    edges = _dht_edges(humidity=55, temp=23)
-    # 마지막 데이터 비트(체크섬 LSB)의 HIGH 길이를 뒤집어 값을 깨뜨린다.
-    lvl, t = edges[-1]
-    edges[-1] = (lvl, t + 44_000)             # 26µs HIGH → 70µs로 늘려 '1'로 만듦
-    try:
-        _DHT11._decode(edges)
-        assert False, "체크섬 오류를 잡지 못했다"
-    except RuntimeError:
-        pass
-
-
-def test_dht11_decode_rejects_no_response():
-    # 센서 무응답(엣지 거의 없음) → 멈추지 않고 예외로 폴백.
-    try:
-        _DHT11._decode([(1, 0)])
-        assert False, "무응답을 잡지 못했다"
-    except RuntimeError:
-        pass
 
 
 def test_missing_temperature_does_not_trigger_hot_cold():

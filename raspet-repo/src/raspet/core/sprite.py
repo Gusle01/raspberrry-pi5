@@ -172,20 +172,12 @@ def _face_cold(ctx, g) -> None:
     ctx.line(g.cx + w * 0.33, y + 2, g.cx + w, y - 2, _DARK)
 
 
-def _face_humid(ctx, g) -> None:
-    # 끈적함: 처진 눈 + 일자 입 + 양 볼 옆 땀방울 둘
-    _eyes_dots(ctx, g, dy=1)
-    ctx.line(g.cx - g.r * 0.25, g.mouth_y, g.cx + g.r * 0.25, g.mouth_y, _DARK)
-    ctx.circle(g.lx - g.er * 2, g.eye_y + 1, max(1, int(g.r * 0.12)), config.COLOR_ACCENT)
-    ctx.circle(g.rx + g.er * 2, g.eye_y + 1, max(1, int(g.r * 0.12)), config.COLOR_ACCENT)
-
-
 _FACES = {
     "neutral": _face_neutral, "happy": _face_happy, "sad": _face_sad,
     "sick": _face_sick, "hungry": _face_hungry, "stressed": _face_stressed,
     "dirty": _face_dirty, "lonely": _face_lonely, "sleepy": _face_sleepy,
     "excited": _face_excited, "asleep": _face_asleep,
-    "hot": _face_hot, "cold": _face_cold, "humid": _face_humid,
+    "hot": _face_hot, "cold": _face_cold,
 }
 
 
