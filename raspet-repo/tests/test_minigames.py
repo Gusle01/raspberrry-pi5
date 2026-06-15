@@ -8,7 +8,7 @@ import pytest
 
 from raspet.minigames.rps import judge, CHOICES
 from raspet.minigames.snake import SnakeEngine
-from raspet.minigames.jump import JumpEngine, height_from_distance
+from raspet.minigames.jump import JumpEngine, Obstacle, height_from_distance
 from raspet.minigames.color_hunt import color_match, _CV_AVAILABLE
 from raspet import config
 
@@ -72,20 +72,49 @@ def test_height_mapping():
     assert 0.0 < mid < 1.0
 
 
-def test_jump_collision_when_low():
+def test_jump_collision_outside_gap():
     e = JumpEngine()
-    e.obstacles = [e.PLAYER_X]            # 플레이어 위치에 장애물
-    e.set_player_height(0.0)              # 바닥 → 충돌해야 함
+    e.obstacles = [Obstacle(e.PLAYER_X, 0.4, 0.8)]   # 구멍 0.4~0.8
+    e.set_player_height(0.05)             # 바닥 근처 → 구멍 밖(아래 파이프 충돌)
     assert e.step(0.001) is False
     assert e.alive is False
 
 
-def test_jump_clears_when_high():
+def test_jump_collision_against_top_pipe():
     e = JumpEngine()
-    e.obstacles = [e.PLAYER_X]
-    e.set_player_height(1.0)              # 최고점 → 통과
+    e.obstacles = [Obstacle(e.PLAYER_X, 0.4, 0.8)]
+    e.set_player_height(0.98)             # 천장 근처 → 위 파이프 충돌
+    assert e.step(0.001) is False
+    assert e.alive is False
+
+
+def test_jump_clears_through_gap():
+    e = JumpEngine()
+    e.obstacles = [Obstacle(e.PLAYER_X, 0.4, 0.8)]
+    e.set_player_height(0.6)              # 구멍 한가운데 → 통과
     assert e.step(0.001) is True
     assert e.alive is True
+
+
+def test_jump_spawn_gap_is_passable_and_both_pipes_exist():
+    e = JumpEngine(rng=random.Random(0))
+    for _ in range(80):
+        e._spawn()
+    for ob in e.obstacles:
+        assert 0.0 < ob.gap_lo < ob.gap_hi < 1.0
+        # 구멍이 플레이어 전체 높이보다 넉넉히 큼(항상 통과 가능)
+        assert (ob.gap_hi - ob.gap_lo) >= 2 * e.PLAYER_HALF
+        # 위·아래 파이프가 모두 최소 길이 이상 존재
+        assert ob.gap_lo >= e.EDGE_MARGIN - 1e-9
+        assert (1.0 - ob.gap_hi) >= e.EDGE_MARGIN - 1e-9
+
+
+def test_jump_spawn_lengths_vary():
+    e = JumpEngine(rng=random.Random(3))
+    for _ in range(30):
+        e._spawn()
+    bottoms = {round(ob.gap_lo, 3) for ob in e.obstacles}
+    assert len(bottoms) > 5               # 아래 파이프 길이가 제각각
 
 
 def test_ultrasonic_dummy_returns_far_distance():

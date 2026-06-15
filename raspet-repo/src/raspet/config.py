@@ -144,7 +144,7 @@ BMP180_I2C_ADDR = 0x77
 BMP180_OVERSAMPLING = 1     # 0~3 (클수록 정밀하지만 느림)
 # 온도 쾌적 범위(℃). 이 범위를 벗어나면 캐릭터가 더워/추워한다.
 TEMP_COLD_BELOW_C = 15      # 이하 → 추워요
-TEMP_HOT_ABOVE_C = 28       # 이상 → 더워요
+TEMP_HOT_ABOVE_C = 30       # 이상 → 더워요
 # 습도(현재 BMP180엔 없음 → None). BME280 등을 달면 이 임계값으로 '끈적함'을 표현할 수 있다.
 HUMID_HIGH_ABOVE = 70       # % 이상 (향후 사용)
 
@@ -237,6 +237,10 @@ JUMP_DISTANCE_MIN_CM = 5    # 이보다 가까우면 최대 점프
 JUMP_DISTANCE_MAX_CM = 40   # 이보다 멀면 바닥
 JUMP_REWARD_PER_OBSTACLE = 2
 JUMP_OBSTACLE_INTERVAL_MS = 1400
+# 위·아래 파이프 사이 통과 구멍 크기(정규화 0~1). 플레이어(높이 ≈0.14)보다 넉넉히 크게
+# 둬 항상 통과 가능. 구멍 위치가 매번 달라 위·아래 파이프 길이도 제각각이 된다.
+JUMP_GAP_MIN = 0.40
+JUMP_GAP_MAX = 0.52
 
 # ── 색깔 찾기 ────────────────────────────────────────
 COLOR_HUNT_ROUNDS = 3
