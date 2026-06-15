@@ -23,9 +23,10 @@ ACTION_HOLE = {"left": 0, "down": 1, "right": 2}
 class WhackEngine:
     """두더지 잡기의 순수 게임 로직(시간은 update(dt)로 주입)."""
 
-    def __init__(self, rng=None, duration=None) -> None:
+    def __init__(self, rng=None, duration=None, holes=HOLES) -> None:
         self.rng = rng or random.Random()
         self.duration = config.WHACK_DURATION_S if duration is None else duration
+        self.holes = holes          # 구멍(셀) 개수. 기본 3(버튼 모드), 키패드는 4×4=16.
         self.elapsed = 0.0
         self.coins = 0          # 획득 재화(=점수)
         self.hits = 0
@@ -49,7 +50,7 @@ class WhackEngine:
         return 2 if self.elapsed >= config.WHACK_DOUBLE_AFTER_S else 1
 
     def _spawn(self) -> None:
-        free = [i for i in range(HOLES) if i not in self.moles]
+        free = [i for i in range(self.holes) if i not in self.moles]
         if not free:
             return
         hole = self.rng.choice(free)
@@ -118,9 +119,12 @@ class WhackAMole(MiniGame):
 
     def __init__(self, ctx=None, rng=None) -> None:
         self.ctx = ctx
-        self.engine = WhackEngine(rng=rng)
+        self._rng = rng
+        self.engine = None          # play()에서 모드(구멍 수)를 정한 뒤 생성
         self._frame = 0
-        self._best = 0          # 시작 전 베스트 기록(플레이 중·종료 화면 표시용)
+        self._best = 0              # 시작 전 베스트 기록(플레이 중·종료 화면 표시용)
+        self._grid = (1, HOLES)     # (행, 열) — 키패드면 4×4, 아니면 1×3
+        self._keypad = None         # 그리드 모드에서 직접 읽을 키패드
 
     def play(self) -> int:
         ctx = self.ctx
@@ -130,31 +134,62 @@ class WhackAMole(MiniGame):
         ch = getattr(getattr(ctx, "app", None), "character", None)
         if ch is not None:
             self._best = ch.best_score(self.name)
-        # 두더지 잡기 동안에는 3버튼이 확인/뒤로가 아니라 구멍(0·1·2) 전용이 된다.
-        ctx.set_button_actions(config.BUTTON_GAME_ACTIONS)
-        aborted = False
+        # 입력 모드 결정: 4×4 키패드가 있으면 OLED 격자 모드, 없으면 기존 3구멍(버튼) 모드.
+        keypad = ctx.hw.get("keypad")
+        grid_mode = keypad is not None and getattr(keypad, "available", False)
+        if grid_mode:
+            rows, cols = config.WHACK_GRID_ROWS, config.WHACK_GRID_COLS
+            self._keypad = keypad
+            ctx.set_keypad_mode("grid")     # poll()이 키패드를 소비하지 않게 → 직접 읽는다
+        else:
+            rows, cols = 1, HOLES
+            ctx.set_button_actions(config.BUTTON_GAME_ACTIONS)  # 3버튼=구멍(0·1·2)
+        self._grid = (rows, cols)
+        self.engine = WhackEngine(rng=self._rng, holes=rows * cols)
         try:
-            while ctx.running and not self.engine.over:
-                for a in ctx.poll():
-                    if a == "b":            # (PC ESC 등) 중단
-                        aborted = True
-                        break
-                    if a in ACTION_HOLE:
-                        self.engine.whack(ACTION_HOLE[a])
-                if aborted:
-                    break
-                dt = ctx.tick()
-                self.engine.update(dt)
-                self._feedback()
-                self._render()
-                self._frame += 1
+            self._loop(grid_mode)
         finally:
             ctx.leds_off()
-            ctx.use_menu_buttons()          # 게임오버·메뉴를 위해 버튼을 확인/뒤로로 복귀
+            if grid_mode:
+                ctx.set_keypad_mode("menu")
+            else:
+                ctx.use_menu_buttons()      # 게임오버·메뉴용으로 버튼을 확인/뒤로로 복귀
         return self._finish()
 
+    def _loop(self, grid_mode) -> None:
+        ctx = self.ctx
+        while ctx.running and not self.engine.over:
+            actions = ctx.poll()
+            if "b" in actions:              # 키보드 ESC / 조이스틱 등으로 중단
+                break
+            if grid_mode:
+                if self._read_keypad():     # 뒤로 키 → 중단
+                    break
+            else:
+                for a in actions:
+                    if a in ACTION_HOLE:
+                        self.engine.whack(ACTION_HOLE[a])
+            self.engine.update(ctx.tick())
+            self._feedback(grid_mode)
+            if grid_mode:
+                self._render_grid()
+            else:
+                self._render_holes()
+            self._frame += 1
+
+    def _read_keypad(self) -> bool:
+        """그리드 모드: 키패드로 눌린 셀을 친다. 뒤로 키가 눌리면 True(중단)."""
+        _, cols = self._grid
+        for (r, c) in self._keypad.pressed_edges():
+            if self._keypad.key_label(r, c) == config.KEYPAD_BACK_KEY:
+                return True
+            idx = r * cols + c
+            if 0 <= idx < self.engine.holes:
+                self.engine.whack(idx)
+        return False
+
     # ── 출력: 부저 + LED ─────────────────────────────────
-    def _feedback(self) -> None:
+    def _feedback(self, grid_mode) -> None:
         ctx = self.ctx
         for kind, _hole in self.engine.events:
             if kind == "hit":
@@ -166,29 +201,39 @@ class WhackAMole(MiniGame):
             elif kind == "miss":
                 ctx.beep(392, 0.03)
         self.engine.events.clear()
-        # LED: 두더지=점등, 함정=깜빡임(구분), 빈 구멍=소등
         blink_on = (self._frame // 3) % 2 == 0
-        for i in range(HOLES):
-            m = self.engine.moles.get(i)
-            on = bool(m) and (m["kind"] == "mole" or blink_on)
-            ctx.led(i, on)
+        if grid_mode:
+            # 셀이 16개라 칸마다 LED를 줄 수 없으므로 3 LED를 전역 표시등으로 쓴다:
+            #   초록(0)=콤보 중, 빨강(1)=함정이 떠 있음(주의), 노랑(2)=두더지 등장 중.
+            any_trap = any(m["kind"] == "trap" for m in self.engine.moles.values())
+            any_mole = any(m["kind"] == "mole" for m in self.engine.moles.values())
+            ctx.led(0, self.engine.combo >= config.WHACK_COMBO_STEP)
+            ctx.led(1, any_trap and blink_on)
+            ctx.led(2, any_mole)
+        else:
+            # LED: 두더지=점등, 함정=깜빡임(구분), 빈 구멍=소등
+            for i in range(HOLES):
+                m = self.engine.moles.get(i)
+                on = bool(m) and (m["kind"] == "mole" or blink_on)
+                ctx.led(i, on)
 
-    # ── 출력: 화면 ───────────────────────────────────────
-    def _render(self) -> None:
-        ctx = self.ctx
-        e = self.engine
-        ctx.clear()
-        # 남은 시간 막대(상단)
-        ratio = max(0.0, 1.0 - e._progress())
-        ctx.rect(0, 0, int(ctx.width * ratio), 3, config.COLOR_ACCENT)
-        # 점수 · 콤보 · 베스트
+    # ── 출력: 공통 HUD ───────────────────────────────────
+    def _hud(self) -> None:
+        ctx, e = self.ctx, self.engine
+        ctx.rect(0, 0, int(ctx.width * max(0.0, 1.0 - e._progress())), 3,
+                 config.COLOR_ACCENT)                    # 남은 시간 막대
         ctx.text(f"{e.coins}", 2, 6, color=config.COLOR_WARN, small=True)
         ctx.text(f"최고 {self._best}", ctx.width // 2, 8,
                  color=config.COLOR_DIM, small=True, center=True)
         if e.combo >= 2:
             ctx.text(f"x{e.combo}", ctx.width - 22, 6,
                      color=config.COLOR_ACCENT, small=True)
-        # 구멍 3개
+
+    # ── 출력: 기존 3구멍(버튼) 화면 ──────────────────────
+    def _render_holes(self) -> None:
+        ctx, e = self.ctx, self.engine
+        ctx.clear()
+        self._hud()
         blink_on = (self._frame // 3) % 2 == 0
         for i in range(HOLES):
             cx, cy, r = self._HOLE_CX[i], self._HOLE_CY, self._HOLE_R
@@ -202,9 +247,40 @@ class WhackAMole(MiniGame):
                 ctx.circle(cx, cy, r - 3, config.COLOR_WARN, fill=False)
                 ctx.line(cx - 4, cy - 4, cx + 4, cy + 4, config.COLOR_WARN)
                 ctx.line(cx - 4, cy + 4, cx + 4, cy - 4, config.COLOR_WARN)
-            # 버튼 위치 힌트
             ctx.text(self._HINT[i], cx - 4, cy + r + 2,
                      color=config.COLOR_DIM, small=True)
+        ctx.present()
+
+    # ── 출력: 4×4 키패드 격자 화면 ───────────────────────
+    def _render_grid(self) -> None:
+        ctx, e = self.ctx, self.engine
+        rows, cols = self._grid
+        ctx.clear()
+        self._hud()
+        top = 13                                  # HUD 아래부터 격자 시작
+        cell_w = ctx.width // cols
+        cell_h = (ctx.height - top) // rows
+        blink_on = (self._frame // 3) % 2 == 0
+        for idx in range(self.engine.holes):
+            r, c = idx // cols, idx % cols
+            x, y = c * cell_w, top + r * cell_h
+            cx, cy = x + cell_w // 2, y + cell_h // 2
+            rad = max(2, min(cell_w, cell_h) // 2 - 2)
+            ctx.rect(x + 1, y + 1, cell_w - 2, cell_h - 2,
+                     config.COLOR_DIM, fill=False)              # 셀 테두리
+            m = e.moles.get(idx)
+            if m and m["kind"] == "mole":
+                ctx.circle(cx, cy, rad, config.COLOR_ACCENT)
+                ctx.circle(cx - rad // 2, cy - 1, 1, (30, 30, 40))   # 눈
+                ctx.circle(cx + rad // 2, cy - 1, 1, (30, 30, 40))
+            elif m and m["kind"] == "trap" and blink_on:
+                ctx.line(cx - rad, cy - rad, cx + rad, cy + rad, config.COLOR_WARN)
+                ctx.line(cx - rad, cy + rad, cx + rad, cy - rad, config.COLOR_WARN)
+            else:
+                # 빈 칸: 어떤 키를 누르면 되는지 키패드 라벨을 흐리게 표시
+                label = self._keypad.key_label(r, c) if self._keypad else ""
+                if label:
+                    ctx.text(label, x + 2, y + 1, color=config.COLOR_DIM, small=True)
         ctx.present()
 
     # ── 종료 ─────────────────────────────────────────────

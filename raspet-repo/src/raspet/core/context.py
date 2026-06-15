@@ -120,6 +120,8 @@ class GameContext:
         self._prev_dir = "center"   # 조이스틱 엣지 검출용
         # 물리 버튼(인덱스)→행동 매핑. 평소엔 메뉴(확인/뒤로), 미니게임은 set_button_actions로 전환.
         self._button_actions = self._menu_button_actions()
+        # 키패드 모드: "menu"면 poll()이 키패드를 메뉴 행동으로 변환, "grid"면 게임이 직접 읽음.
+        self._keypad_mode = "menu"
         # 환경 센서 스냅샷 캐시 — 매 프레임 I2C/ADC를 다시 읽지 않도록 폴링 주기로 제한한다.
         self._env_reading = None
         self._env_last_ms = -10 ** 9
@@ -191,6 +193,16 @@ class GameContext:
                     if act:
                         self._actions.add(act)
 
+        # 4×4 키패드(있으면): 평소엔 키→메뉴 행동으로 변환한다. '그리드' 모드(예: 키패드
+        # 두더지 잡기)에서는 게임이 키패드를 직접 읽으므로 여기서는 건드리지 않는다.
+        keypad = self.hw.get("keypad")
+        if (keypad is not None and getattr(keypad, "available", False)
+                and self._keypad_mode == "menu"):
+            for (r, c) in keypad.pressed_edges():
+                act = config.KEYPAD_MENU_ACTIONS.get(keypad.key_label(r, c))
+                if act:
+                    self._actions.add(act)
+
         return self._actions
 
     @property
@@ -214,6 +226,11 @@ class GameContext:
     def use_menu_buttons(self) -> None:
         """버튼 매핑을 평소(메뉴: 확인/뒤로) 모드로 되돌린다."""
         self._button_actions = self._menu_button_actions()
+
+    def set_keypad_mode(self, mode: str) -> None:
+        """키패드 처리 모드를 바꾼다. "grid"면 poll()이 키패드를 소비하지 않아 게임이
+        키패드를 직접(셀 단위로) 읽을 수 있다. 게임 종료 시 "menu"로 되돌려야 한다."""
+        self._keypad_mode = mode
 
     def update_indicator_leds(self) -> None:
         """평소 화면에서 확인('a')/뒤로('b') 버튼의 LED를 켜 위치를 표시한다."""
@@ -382,8 +399,8 @@ class GameContext:
 
     def quit(self) -> None:
         self.close_camera_window()
-        # GPIO 자원(LED·버튼) 정리 후 pygame 종료
-        for key in ("leds", "buttons"):
+        # GPIO 자원(LED·버튼·키패드) 정리 후 pygame 종료
+        for key in ("leds", "buttons", "keypad"):
             dev = self.hw.get(key)
             if dev is not None and hasattr(dev, "close"):
                 try:

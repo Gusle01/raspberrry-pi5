@@ -13,22 +13,27 @@ from .hardware.joystick import create_joystick
 from .hardware.ultrasonic import create_ultrasonic
 from .hardware.buzzer import create_buzzer
 from .hardware.leds import create_leds
-from .hardware.buttons import create_buttons
+from .hardware.buttons import create_buttons, DummyButtons
+from .hardware.keypad import create_keypad
 from .hardware.environment import create_environment
 from .vision.camera import create_camera
 from .vision.hand import create_hand_recognizer
+from . import config
 from .storage import save
 
 
 def build_hardware() -> dict:
     """연결된 장치를 잡거나 더미로 폴백한 하드웨어 묶음을 만든다."""
+    # 키패드를 쓰면 3버튼과 핀(16·20·21)을 공유하므로 별도 버튼 장치는 더미로 둔다.
+    buttons = DummyButtons() if config.KEYPAD_ENABLED else create_buttons()
     return {
         "display": create_display(),
         "joystick": create_joystick(),
         "ultrasonic": create_ultrasonic(),
         "buzzer": create_buzzer(),
         "leds": create_leds(),
-        "buttons": create_buttons(),
+        "buttons": buttons,
+        "keypad": create_keypad(),
         "env": create_environment(),
         "camera": create_camera(),
         "hand": create_hand_recognizer(),
