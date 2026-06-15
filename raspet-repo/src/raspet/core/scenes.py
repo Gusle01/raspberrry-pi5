@@ -10,7 +10,8 @@ from . import daytime, sfx
 from .. import config, events, achievements
 from ..character import needs
 from ..character.mood import mood_label, MOOD_LABELS
-from ..character.endings import determine_ending
+from ..character.endings import determine_ending, check_forced_ending
+from ..storage import save
 from ..minigames.omok import Omok, HUMAN, AI, EMPTY
 from ..minigames.rps import RockPaperScissors
 from ..minigames.snake import Snake
@@ -303,8 +304,10 @@ class MenuScene(Scene):
         #  XP 레벨 전용으로 두고 여기선 표기하지 않는다 → 'Lv' 중복 제거)
         ctx.text(ch.name, 4, 2, color=config.COLOR_ACCENT, small=True)
         ctx.text(f"C:{ch.currency}", 40, 2, color=config.COLOR_WARN, small=True)
-        # 환경: 현재 온도(BMP180). 센서가 없으면 표시하지 않는다. 펫 오른쪽·메뉴 왼쪽 빈칸.
-        _draw_temperature(ctx, x=40, y=13)
+        # 키운 일수(D+N): 돌보기 행동 1회 = 하루. 펫 오른쪽·메뉴 왼쪽 빈칸.
+        ctx.text(f"D+{ch.day}", 40, 13, color=config.COLOR_FG, small=True)
+        # 환경: 현재 온도(BMP180). 센서가 없으면 표시하지 않는다. 온도는 일수 아래 줄.
+        _draw_temperature(ctx, x=40, y=23)
         # 우측 컬럼 전체 높이를 써서 6개 항목을 모두 표시(잘림/스크롤 없음).
         self.menu.render(ctx, x=66, y=2)
         # 하단: 레벨 + XP 진행 바 (높이 기준 앵커 → 절대 안 잘림)
@@ -344,6 +347,13 @@ class CareScene(Scene):
             return
         fn(app.character)
         sfx.confirm(app.ctx)
+        # 행동 1회 = 하루: 하루 진행(자동 감소 포함) 후 방치/스트레스 엔딩을 검사한다.
+        needs.advance_day(app.character)
+        forced = check_forced_ending(app.character)
+        if forced is not None:
+            sfx.event(app.ctx)
+            app.switch(EndingScene(forced))
+            return
         # 돌보기/훈련 XP 적립 (훈련은 라벨이 '…훈련'으로 끝난다)
         xp = config.XP_REWARDS["train"] if label.endswith("훈련") else config.XP_REWARDS["care"]
         # 훈련으로 능력치 임계값을 넘으면 업적이 해금될 수 있다.
@@ -519,20 +529,38 @@ class AchievementScene(Scene):
 
 # ── 엔딩 씬 ──────────────────────────────────────────────
 class EndingScene(Scene):
+    """엔딩을 보여주고, 확인을 누르면 새 세대로 초기화(업적·기록 유지)한 뒤 메뉴로 돌아간다.
+
+    ending이 주어지면 그 엔딩(방치/스트레스 등 강제 엔딩)을, 없으면 스탯 기반 '졸업'
+    엔딩을 보여준다('엔딩' 메뉴로 진입한 경우).
+    """
+
+    def __init__(self, ending: dict | None = None) -> None:
+        self._ending = ending          # 강제 엔딩 dict 또는 None(=스탯 기반 자동 판정)
+        self._done = False
+
+    def _resolved(self, ch) -> dict:
+        return self._ending or determine_ending(ch)
+
     def handle_input(self, actions, app) -> None:
-        if actions:
+        if actions and not self._done:
+            self._done = True          # 첫 입력에만 반응(중복 초기화 방지)
+            app.character.reset_life()  # 새 세대로 초기화(업적·베스트기록·이름 유지)
+            save.save_game(app.character)
+            sfx.confirm(app.ctx)
             app.switch(MenuScene())
 
     def render(self, ctx) -> None:
         ch = ctx.app.character
-        ending = determine_ending(ch)
+        ending = self._resolved(ch)
         _bg(ctx)
-        draw_pet(ctx, ch, ctx.width // 2, 12, scale=0.8)
-        ctx.text(ending["title"], ctx.width // 2, 26,
+        # 큰 제목(21px) + 본문 2줄 + 안내문이 64px에 들어가도록 펫 그림 없이 텍스트 중심으로.
+        ctx.text(ending["title"], ctx.width // 2, 15,
                  color=config.COLOR_ACCENT, big=True, center=True)
-        # 본문은 작은 폰트로 최대 2줄(y=40,51 → 바닥 64 이내).
-        for i, line in enumerate(_wrap(ending["desc"], 20)[:2]):
-            ctx.text(line, ctx.width // 2, 40 + i * 11, center=True, small=True)
+        for i, line in enumerate(_wrap(ending["desc"], 14)[:2]):   # 폭 14자 ≈ 화면 안
+            ctx.text(line, ctx.width // 2, 32 + i * 11, center=True, small=True)
+        ctx.text_bottom("아무 키나 누르면 새로 시작", ctx.width // 2,
+                        color=config.COLOR_DIM, center=True, small=True, margin=2)
 
 
 # ── 미니게임 실행 + 보상/이벤트/업적 처리 ────────────────

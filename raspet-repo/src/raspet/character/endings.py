@@ -19,3 +19,18 @@ def determine_ending(character) -> dict:
             return ending
     # config가 비정상적이어도 죽지 않도록 안전망
     return {"id": "unknown", "title": "???", "desc": "이야기는 계속된다."}
+
+
+def check_forced_ending(character) -> dict | None:
+    """방치·스트레스로 인한 강제(나쁜) 엔딩을 판정한다. 없으면 None.
+
+    매 하루(돌보기 행동) 후 호출한다. 스트레스가 최대치면 즉시 가출, 포만/청결/행복이
+    연속 NEGLECT_ENDING_DAYS일 이상 0이면 해당 방치 엔딩을 돌려준다.
+    """
+    if character.stress >= config.STAT_MAX:
+        return config.FORCED_ENDINGS["stress"]
+    threshold = config.NEGLECT_ENDING_DAYS
+    for need in ("fullness", "cleanliness", "happiness"):
+        if character.zero_days.get(need, 0) >= threshold:
+            return config.FORCED_ENDINGS[need]
+    return None

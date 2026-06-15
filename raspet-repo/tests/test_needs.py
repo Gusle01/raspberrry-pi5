@@ -35,3 +35,30 @@ def test_feed_clean_play():
     assert ch.cleanliness == 10 + config.CLEAN_CLEANLINESS
     assert ch.happiness == 10 + config.FEED_HAPPINESS + config.PLAY_HAPPINESS
     assert ch.stress == 50 - config.PLAY_STRESS_RELIEF
+
+
+# ── 하루(일수) 진행 + 방치 카운터 ────────────────────────
+def test_advance_day_increments_and_decays():
+    ch = Character(fullness=100, cleanliness=100, day=0)
+    needs.advance_day(ch)
+    assert ch.day == 1
+    assert ch.fullness == 100 - config.DAY_FULLNESS_DECAY
+    assert ch.cleanliness == 100 - config.DAY_CLEANLINESS_DECAY
+    assert ch.zero_days.get("fullness", 0) == 0     # 아직 0 아님
+
+
+def test_advance_day_counts_consecutive_zero_and_resets():
+    ch = Character(fullness=0, cleanliness=50, happiness=50)
+    needs.advance_day(ch)
+    assert ch.zero_days["fullness"] == 1            # 포만 0 → 카운트 시작
+    needs.advance_day(ch)
+    assert ch.zero_days["fullness"] == 2            # 연속 유지 → 누적
+    needs.feed(ch); needs.feed(ch)                  # 포만 회복
+    needs.advance_day(ch)
+    assert ch.zero_days["fullness"] == 0            # 0 벗어나면 리셋
+
+
+def test_advance_day_bottomed_needs_hurt_happiness():
+    ch = Character(fullness=0, cleanliness=0, happiness=100)
+    needs.advance_day(ch)
+    assert ch.happiness == 100 - config.DAY_NEGLECT_HAPPINESS

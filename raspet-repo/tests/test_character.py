@@ -10,6 +10,23 @@ def test_grow_clamps_to_max():
     assert gained == 2
 
 
+def test_reset_life_keeps_records_resets_progress():
+    ch = Character(name="별이", intellect=80, stress=90, fullness=0, day=42,
+                   currency=999, xp=500, stage=3,
+                   zero_days={"fullness": 5},
+                   achievements=["first_game"], best_scores={"두더지 잡기": 30})
+    ch.reset_life()
+    # 유지: 이름·업적·베스트기록
+    assert ch.name == "별이"
+    assert ch.achievements == ["first_game"]
+    assert ch.best_scores == {"두더지 잡기": 30}
+    # 초기화: 능력치·일수·돌봄·진행·재화
+    assert ch.day == 0 and ch.zero_days == {}
+    assert ch.intellect == 10 and ch.stress == 0 and ch.fullness == 100
+    assert ch.xp == 0 and ch.stage == 0
+    assert ch.currency == config.START_CURRENCY
+
+
 def test_grow_stress_penalty():
     low = Character(stress=0, strength=10)
     high = Character(stress=config.STRESS_PENALTY_THRESHOLD, strength=10)

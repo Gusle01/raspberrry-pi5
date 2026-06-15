@@ -38,6 +38,10 @@ class Character:
     inventory: list = field(default_factory=list)
     stage: int = 0          # 성장 단계(진화: 누적 능력치 기반)
     xp: int = 0             # 누적 경험치(전체 진행도 레이어 → 레벨은 여기서 파생)
+    # 일수(다마고치): 돌보기 행동 1회 = 하루. 메인 화면에 D+day로 표시.
+    day: int = 0
+    # 포만/청결/행복이 연속으로 0인 일수(방치 엔딩 판정). need 이름 → 일수.
+    zero_days: dict = field(default_factory=dict)
     # 통계/도전 과제
     games_played: int = 0           # 미니게임 플레이 횟수
     total_earned: int = 0           # 누적 획득 재화
@@ -119,6 +123,18 @@ class Character:
         before = self.level()
         self.xp = max(0, self.xp + int(amount))
         return before, self.level()
+
+    # ── 세대 교체(엔딩 후 초기화) ────────────────────────
+    def reset_life(self) -> None:
+        """엔딩 후 새 세대로 초기화한다(같은 객체를 유지한 채 필드만 갈아끼움).
+
+        업적·베스트기록·이름은 평생 유지하고, 능력치·일수·돌봄·재화·진행은 새로 시작한다.
+        """
+        fresh = Character(name=self.name, currency=config.START_CURRENCY)
+        fresh.achievements = list(self.achievements)   # 세대 계승: 업적·기록 보존
+        fresh.best_scores = dict(self.best_scores)
+        for f in self.__dataclass_fields__:
+            setattr(self, f, getattr(fresh, f))
 
     # ── 직렬화 ──────────────────────────────────────────
     def to_dict(self) -> dict:

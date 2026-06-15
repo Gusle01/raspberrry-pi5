@@ -50,6 +50,40 @@ def test_color_hunt_with_detector():
     assert reward == config.COLOR_HUNT_ROUNDS * config.COLOR_HUNT_REWARD_PER_ROUND
 
 
+def test_care_action_advances_one_day(monkeypatch):
+    from raspet.core.game_loop import GameLoop
+    from raspet.core.scenes import CareScene
+    from raspet.storage import save
+    monkeypatch.setattr(save, "save_game", lambda ch: None)   # 저장 부작용 차단
+    ctx = make_ctx([set()])
+    ch = Character()
+    app = GameLoop(ctx, ch)
+    scene = CareScene()
+    app.scenes.switch_to(scene)
+    scene.menu.index = 0                       # '먹이주기'
+    scene.handle_input({"a"}, app)
+    assert ch.day == 1                         # 행동 1회 = 하루
+
+
+def test_neglect_triggers_ending_then_resets(monkeypatch):
+    from raspet.core.game_loop import GameLoop
+    from raspet.core.scenes import CareScene, EndingScene
+    from raspet.storage import save
+    monkeypatch.setattr(save, "save_game", lambda ch: None)
+    ctx = make_ctx([set(), set()])
+    # 포만이 이번 하루에 0이 되고, 그동안 누적 0일수가 임계 직전 → 이번 행동에 엔딩.
+    ch = Character(fullness=config.DAY_FULLNESS_DECAY, day=9,
+                   zero_days={"fullness": config.NEGLECT_ENDING_DAYS - 1})
+    app = GameLoop(ctx, ch)
+    scene = CareScene()
+    app.scenes.switch_to(scene)
+    scene.menu.index = 3                        # '근력훈련'(포만 회복 안 함) → 포만 0 유지
+    scene.handle_input({"a"}, app)
+    assert isinstance(app.scenes.current, EndingScene)   # 도둑 엔딩 화면
+    app.scenes.current.handle_input({"a"}, app)          # 확인 → 새 세대로 초기화
+    assert ch.day == 0 and ch.fullness == 100 and ch.zero_days == {}
+
+
 def test_omok_via_launcher_aborts_cleanly():
     """창이 닫히면(스크립트 소진) 오목 런처가 AbortGame을 삼키고 0을 반환한다."""
     from raspet.core.scenes import run_minigame

@@ -183,6 +183,24 @@ CLEAN_CLEANLINESS = 35     # 씻기기 → 청결도
 PLAY_HAPPINESS = 12        # 놀아주기 → 행복도
 PLAY_STRESS_RELIEF = 8     # 놀아주기 → 스트레스 감소
 
+# ── 하루(일수) & 방치 엔딩 ───────────────────────────
+# 돌보기 행동(먹이/씻기/놀기/훈련) 1회 = 하루. 메인 화면에 D+일수로 표시한다.
+DAY_FULLNESS_DECAY = 8       # 하루가 지날 때 포만도 자동 감소
+DAY_CLEANLINESS_DECAY = 6    # 하루가 지날 때 청결도 자동 감소
+DAY_NEGLECT_HAPPINESS = 10   # 포만/청결이 바닥인 날엔 행복도 추가 하락
+NEGLECT_ENDING_DAYS = 3      # 포만/청결/행복이 연속 이 일수만큼 0이면 방치 엔딩
+# 방치/스트레스로 인한 강제(나쁜) 엔딩. 발생하면 화면 표시 후 새 세대로 초기화된다.
+FORCED_ENDINGS = {
+    "fullness":    {"id": "thief",    "title": "도둑",
+                    "desc": "굶주림에 지쳐 도둑이 되어 떠났다."},
+    "cleanliness": {"id": "sick",     "title": "질병",
+                    "desc": "더러움 속에 병들어 앓다가 떠나갔다."},
+    "happiness":   {"id": "wanderer", "title": "방랑자",
+                    "desc": "행복을 잃고 정처 없이 떠도는 방랑자가 됐다."},
+    "stress":      {"id": "runaway",  "title": "가출",
+                    "desc": "쌓인 스트레스에 집을 뛰쳐나갔다."},
+}
+
 # 능력치 훈련 효과 (스트레스가 높으면 효율 감소)
 TRAIN_AMOUNT = 6
 STRESS_PER_TRAIN = 5
@@ -276,15 +294,15 @@ SHOP_ITEMS = [
 # requires: 해당 능력치가 값 이상이면 충족. 마지막 항목은 기본(fallback) 엔딩.
 ENDINGS = [
     {"id": "scholar", "title": "학자", "requires": {"intellect": 70},
-     "desc": "깊은 지식으로 세상의 비밀을 탐구하는 학자가 되었다."},
+     "desc": "깊은 지식으로 세상을 탐구하는 학자가 됐다."},
     {"id": "artist", "title": "예술가", "requires": {"sensitivity": 70},
-     "desc": "풍부한 감수성으로 사람들의 마음을 울리는 예술가가 되었다."},
+     "desc": "풍부한 감수성으로 마음을 울리는 예술가가 됐다."},
     {"id": "adventurer", "title": "모험가", "requires": {"strength": 70},
-     "desc": "강인한 체력으로 미지의 세계를 누비는 모험가가 되었다."},
+     "desc": "강인한 힘으로 세계를 누비는 모험가가 됐다."},
     {"id": "star", "title": "스타", "requires": {"charm": 70},
-     "desc": "타고난 매력으로 모두의 사랑을 받는 스타가 되었다."},
+     "desc": "타고난 매력으로 사랑받는 스타가 됐다."},
     {"id": "ordinary", "title": "평범한 행복", "requires": {},
-     "desc": "특출나진 않지만 평온하고 행복한 삶을 살았다."},
+     "desc": "특출나진 않아도 평온하고 행복하게 살았다."},
 ]
 
 # ── 감정(무드) 규칙 ──────────────────────────────────

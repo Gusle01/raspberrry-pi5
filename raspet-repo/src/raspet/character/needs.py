@@ -38,6 +38,24 @@ def apply_time_decay(character, last_played_ts: float, now_ts: float) -> dict:
     }
 
 
+def advance_day(character) -> None:
+    """돌보기 행동 1회 = 하루. 하루치 자동 감소를 적용하고 일수/방치 카운터를 갱신한다.
+
+    포만/청결이 매일 조금씩 줄어 방치 압박을 만들고, 바닥이면 행복도 함께 깎인다.
+    포만·청결·행복이 연속으로 0인 일수를 세어(zero_days) 방치 엔딩 판정에 쓴다.
+    """
+    character.day += 1
+    character.apply_effects({"fullness": -config.DAY_FULLNESS_DECAY,
+                             "cleanliness": -config.DAY_CLEANLINESS_DECAY})
+    if character.fullness <= 0 or character.cleanliness <= 0:
+        character.apply_effects({"happiness": -config.DAY_NEGLECT_HAPPINESS})
+    for need in ("fullness", "cleanliness", "happiness"):
+        if getattr(character, need) <= 0:
+            character.zero_days[need] = character.zero_days.get(need, 0) + 1
+        else:
+            character.zero_days[need] = 0
+
+
 def feed(character) -> None:
     """먹이 주기: 포만도·행복도 상승."""
     character.apply_effects({"fullness": config.FEED_FULLNESS,
