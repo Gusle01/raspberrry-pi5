@@ -128,11 +128,13 @@ class HandRecognizer:
         """
         ycrcb = cv2.cvtColor(frame, cv2.COLOR_RGB2YCrCb)
         mask = cv2.inRange(ycrcb, (0, 133, 77), (255, 173, 127))
-        mask = cv2.GaussianBlur(mask, (5, 5), 0)
-        # 잡음/구멍 정리: 열림→닫힘으로 마스크 안정화
-        kernel = np.ones((5, 5), np.uint8)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
-        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+        # 점잡음(소금후추) 제거 후, 작은 노이즈는 열림으로 깎고 조각난 손은 큰
+        # 커널 닫힘으로 하나로 병합한다(경계도 매끈해져 solidity가 안정된다).
+        mask = cv2.medianBlur(mask, 5)
+        k_small = np.ones((5, 5), np.uint8)
+        k_big = np.ones((11, 11), np.uint8)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, k_small)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, k_big, iterations=2)
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
                                        cv2.CHAIN_APPROX_SIMPLE)
         info = {"count": None, "area": 0.0, "solidity": 0.0,

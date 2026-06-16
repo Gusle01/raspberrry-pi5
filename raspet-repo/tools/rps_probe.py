@@ -24,6 +24,7 @@ def _open_camera():
     """picamera2 우선, 없으면 rpicam-still 폴백으로 프레임 공급자를 만든다."""
     try:
         from picamera2 import Picamera2
+        import numpy as np
         if Picamera2.global_camera_info():
             cam = Picamera2()
             cam.configure(cam.create_preview_configuration(
@@ -31,7 +32,13 @@ def _open_camera():
             cam.start()
             time.sleep(0.5)  # AE/AWB 안정화
             print("[probe] picamera2 사용")
-            return (lambda: cam.capture_array()), cam.stop
+            # "RGB888"은 실제 BGR 배열 → RGB로 뒤집어 게임과 동일하게 맞춘다.
+            def grab_pc():
+                f = cam.capture_array()
+                if f is not None and f.ndim == 3 and f.shape[2] == 3:
+                    return np.ascontiguousarray(f[:, :, ::-1])
+                return f
+            return grab_pc, cam.stop
     except Exception as e:
         print(f"[probe] picamera2 불가({e}) → rpicam-still 폴백")
 

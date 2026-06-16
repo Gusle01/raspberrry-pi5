@@ -2,12 +2,23 @@
 
 CSI 카메라에서 프레임을 가져온다.
 picamera2가 없으면 더미(빈 프레임) 구현으로 폴백한다.
+
+주의: picamera2의 "RGB888" 포맷은 이름과 달리 numpy 배열에서 *BGR* 순서로
+나온다. 다운스트림(손 인식 YCrCb 마스킹·미리보기·색깔 찾기 HSV)은 모두 RGB를
+가정하므로, 여기 캡처 소스 한 곳에서 RGB로 뒤집어 통일한다. (이걸 안 하면
+R↔B가 바뀌어 피부색·색상 판정이 전부 어긋난다.)
 """
 try:
     from picamera2 import Picamera2
     _CAM_AVAILABLE = True
 except Exception:
     _CAM_AVAILABLE = False
+
+try:
+    import numpy as np
+    _NP_AVAILABLE = True
+except Exception:
+    _NP_AVAILABLE = False
 
 
 class Camera:
@@ -31,10 +42,19 @@ class Camera:
         return self._cam is not None
 
     def capture_frame(self):
-        """현재 프레임(numpy 배열, RGB)을 반환한다. 없으면 None."""
+        """현재 프레임(numpy 배열, RGB)을 반환한다. 없으면 None.
+
+        picamera2 "RGB888"은 실제로 BGR 배열이라 채널을 뒤집어 RGB로 돌려준다.
+        cv2 연산을 위해 연속(contiguous) 배열로 만든다.
+        """
         if self._cam is None:
             return None
-        return self._cam.capture_array()
+        frame = self._cam.capture_array()
+        if frame is None:
+            return None
+        if _NP_AVAILABLE and getattr(frame, "ndim", 0) == 3 and frame.shape[2] == 3:
+            return np.ascontiguousarray(frame[:, :, ::-1])   # BGR→RGB
+        return frame
 
     def close(self) -> None:
         if self._cam is not None:
