@@ -73,11 +73,13 @@ ADC_CHANNEL_X = 2
 ADC_CHANNEL_Y = 1
 # 조이스틱 누름(SW)을 읽는 방식.
 #  • ADC_CHANNEL_BUTTON 가 None 이 아니면: SW를 MCP3008의 그 채널(아날로그)에서 읽는다.
-#    (실제 배선: SW→MCP3008 CH0. SW는 눌리면 GND로 떨어지므로 값이 낮아진다.)
 #  • None 이면: PIN_JOYSTICK_BUTTON(GPIO 디지털, 내장 풀업)로 읽는다.
-ADC_CHANNEL_BUTTON = 0
-ADC_BUTTON_PRESSED_BELOW = 0.5   # ADC SW 값이 이 미만이면 '눌림'으로 본다(폴라리티 보정용)
-PIN_JOYSTICK_BUTTON = 25    # ADC_CHANNEL_BUTTON 가 None 일 때만 사용하는 GPIO 핀
+# ⚠ 실측 결과 SW를 풀업 없이 MCP3008 CH0로 읽으면 안 눌러도 값이 0.0~0.98로 떠다녀
+#   (floating) 눌림/뗌 구분이 불가능했다. → 기본은 None(GPIO)로 둔다. ADC로 쓰려면
+#   SW와 3.3V 사이에 풀업저항(약 10kΩ)을 달고 아래를 0(=CH0)으로 되돌리면 된다.
+ADC_CHANNEL_BUTTON = None
+ADC_BUTTON_PRESSED_BELOW = 0.5   # ADC SW 값이 이 미만이면 '눌림'으로 본다(풀업 장착 시)
+PIN_JOYSTICK_BUTTON = 25    # ADC_CHANNEL_BUTTON 가 None 일 때 사용하는 GPIO 핀(내장 풀업)
 # 두더지 잡기용 LED·버튼 (BCM). 사용 중 핀(I2C 2·3, 부저 18, 초음파 23·24, 조이스틱 25,
 # SPI 7~11)과 겹치지 않게 배치. 위치(왼/가운데/오른쪽)는 버튼 ←↓→에 대응한다.
 PIN_LEDS = [5, 6, 13, 19]   # LED 4개 (각 220~330Ω 저항 → LED → GND). 5·6·13=기존 3구멍,
@@ -169,6 +171,7 @@ CAMERA_PREVIEW_SIZE = (320, 240)   # 미리보기 창 크기(픽셀)
 
 # ── 입력 ─────────────────────────────────────────────
 JOYSTICK_DEADZONE = 0.35    # 이 값 미만의 기울기는 무시 (정규화 -1.0~1.0)
+JOYSTICK_INVERT_Y = True    # 배선상 위/아래가 반대로 잡혀서 y축을 뒤집는다(밀어 올리면 'up')
 
 # 메뉴 등 평소 화면에서 '색'별 버튼이 하는 행동. 초록=확인, 빨강=뒤로(요청 사항).
 #   "a"=확인, "b"=뒤로, "up"/"down"/"left"/"right"=메뉴 이동, None=없음

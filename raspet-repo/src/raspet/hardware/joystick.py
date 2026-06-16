@@ -43,6 +43,8 @@ class Joystick:
         # MCP3008.value 는 0.0~1.0 → -1.0~1.0 으로 변환
         x = self._adc_x.value * 2.0 - 1.0
         y = self._adc_y.value * 2.0 - 1.0
+        if getattr(config, "JOYSTICK_INVERT_Y", False):
+            y = -y                      # 배선상 위/아래 반전 보정
         return (x, y)
 
     def direction(self) -> str:
