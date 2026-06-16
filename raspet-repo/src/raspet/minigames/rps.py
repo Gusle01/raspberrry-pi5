@@ -6,6 +6,7 @@
 손 인식을 못 쓰는 환경에서는 버튼(좌=바위/상=가위/우=보)으로 선택한다.
 테스트에서는 choice_provider를 주입해 결정적으로 진행한다.
 """
+import math
 import random
 
 from .base import MiniGame
@@ -81,32 +82,56 @@ class RockPaperScissors(MiniGame):
         return None
 
     def _camera_choice(self, hand):
-        """카메라 미리보기 창을 띄운 채 손 모양을 인식해 반환한다.
+        """영상 미리보기를 띄운 채 카운트다운하다가, 0이 되는 순간 프레임을 캡처해 판정한다.
 
-        제한 시간(RPS_CAMERA_SECONDS) 안에 손이 인식되면 그 제스처를, 시간이 지나면
-        None을 돌려준다(그러면 호출부가 버튼 선택으로 폴백한다). 'b'로 취소 가능.
+        RPS_CAMERA_SECONDS 동안 실시간 영상을 보여주며 카운트다운(5·4·3·2·1)을 하고,
+        그동안 인식되는 손은 화면에 미리보기로만 띄운다(즉시 확정하지 않음). 카운트다운이
+        끝나는 순간 찍힌 프레임의 손 모양을 최종 선택으로 확정한다. 인식 실패 시 None을
+        돌려준다(호출부가 버튼 선택으로 폴백). 'b'로 취소 가능.
         """
         ctx = self.ctx
+        total = config.RPS_CAMERA_SECONDS
         elapsed = 0.0
-        while ctx.running and elapsed < config.RPS_CAMERA_SECONDS:
+        gesture = None
+        last_shown = None
+        while ctx.running and elapsed < total:
             for a in ctx.poll():
                 if a == "b":
                     return None
             elapsed += ctx.tick()
             frame = ctx.capture_frame()
-            gesture = hand.classify_gesture(frame)
-            ctx.show_camera(frame, label=gesture or "show your hand")
+            gesture = hand.classify_gesture(frame)   # 미리보기용(아직 확정 아님)
+            remain = max(1, math.ceil(total - elapsed))
+            if remain != last_shown:                 # 매 초 카운트다운 효과음
+                ctx.beep(freq=660, duration=0.04)
+                last_shown = remain
+            ctx.show_camera(frame, label=f"{remain}...")
             ctx.clear()
-            ctx.text("카메라에 손을!", ctx.width // 2, 8, center=True)
-            ctx.text(_LABEL.get(gesture, "..."), ctx.width // 2, 30,
+            ctx.text("준비! 카메라를 봐", ctx.width // 2, 6, center=True)
+            ctx.text(str(remain), ctx.width // 2, 26,
                      color=config.COLOR_ACCENT, big=True, center=True)
-            remain = max(0, int(config.RPS_CAMERA_SECONDS - elapsed))
-            ctx.text(f"{remain}s", ctx.width - 16, 2, color=config.COLOR_DIM)
-            ctx.seg_show_seconds(remain)            # 7세그먼트: 남은 시간
+            ctx.text(f"({_LABEL.get(gesture, '...')})", ctx.width // 2, 52,
+                     color=config.COLOR_DIM, center=True)
+            ctx.seg_show_seconds(remain)             # 7세그먼트: 남은 시간
             ctx.present()
-            if gesture in CHOICES:
-                return gesture
-        return None
+
+        # 카운트다운 종료 → "찰칵!" 그 순간의 프레임을 캡처해 최종 확정한다.
+        final_frame = ctx.capture_frame()
+        final = hand.classify_gesture(final_frame)
+        ctx.beep(freq=1320, duration=0.08)           # 셔터음
+        ctx.show_camera(final_frame, label="찰칵!")
+        ctx.clear()
+        ctx.text("찰칵!", ctx.width // 2, 8, color=config.COLOR_ACCENT,
+                 big=True, center=True)
+        ctx.text(_LABEL.get(final, "인식 실패"), ctx.width // 2, 40,
+                 center=True)
+        ctx.present()
+        # 캡처 결과를 잠깐 보여준다(약 0.7초).
+        hold = 0.0
+        while ctx.running and hold < 0.7:
+            ctx.poll()
+            hold += ctx.tick()
+        return final if final in CHOICES else None
 
     def _show_round(self, rnd, user, com, result):
         ctx = self.ctx
