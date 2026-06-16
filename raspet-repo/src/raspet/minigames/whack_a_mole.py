@@ -163,8 +163,7 @@ class WhackAMole(MiniGame):
             if "b" in actions:              # 키보드 ESC / 조이스틱 등으로 중단
                 break
             if grid_mode:
-                if self._read_keypad():     # 뒤로 키 → 중단
-                    break
+                self._read_keypad()
             else:
                 for a in actions:
                     if a in ACTION_HOLE:
@@ -178,16 +177,19 @@ class WhackAMole(MiniGame):
                 self._render_holes()
             self._frame += 1
 
-    def _read_keypad(self) -> bool:
-        """그리드 모드: 키패드로 눌린 셀을 친다. 뒤로 키가 눌리면 True(중단)."""
+    def _read_keypad(self) -> None:
+        """그리드 모드: 키패드로 눌린 셀을 친다.
+
+        4×4=16칸을 전부 두더지 칸으로 쓰므로, 뒤로키(S1=(0,0))도 게임 중에는
+        일반 0번 칸으로 취급한다. (안 그러면 S1을 누를 때마다 게임이 종료되고,
+        0번 칸 두더지는 영영 못 잡는다. 메뉴에서는 S1=뒤로가 그대로 유효하고,
+        두더지잡기는 30초 타이머로 끝난다.)
+        """
         _, cols = self._grid
         for (r, c) in self._keypad.pressed_edges():
-            if self._keypad.key_label(r, c) == config.KEYPAD_BACK_KEY:
-                return True
             idx = r * cols + c
             if 0 <= idx < self.engine.holes:
                 self.engine.whack(idx)
-        return False
 
     # ── 출력: 부저 + LED ─────────────────────────────────
     def _feedback(self, grid_mode) -> None:

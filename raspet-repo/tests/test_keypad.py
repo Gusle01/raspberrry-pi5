@@ -74,18 +74,20 @@ def test_grid_keypad_hits_correct_cell():
     # (1,2) → idx = 1*4+2 = 6. 그 자리에 두더지를 놓고 누른다.
     g.engine.moles[6] = {"kind": "mole", "age": 0.0, "ttl": 1.0}
     g._keypad.held = {(1, 2)}
-    aborted = g._read_keypad()
-    assert aborted is False
+    g._read_keypad()
     assert g.engine.hits == 1 and 6 not in g.engine.moles
 
 
-def test_grid_keypad_back_key_aborts():
+def test_grid_keypad_back_key_is_now_a_cell():
+    # 두더지잡기 중에는 S1(뒤로키)을 무시하고 일반 0번 칸으로 친다(게임 종료 방지).
     g = WhackAMole(ctx=None)
     g._grid = (4, 4)
     g.engine = WhackEngine(holes=16)
     g._keypad = _FakeKeypad()
-    # 뒤로 키(config.KEYPAD_BACK_KEY, S1='1')의 위치를 찾아 누른다.
     pos = next((r, c) for r in range(4) for c in range(4)
                if config.KEYPAD_LAYOUT[r][c] == config.KEYPAD_BACK_KEY)
+    assert pos == (0, 0)                       # S1 = (0,0) = 0번 칸
+    g.engine.moles[0] = {"kind": "mole", "age": 0.0, "ttl": 1.0}
     g._keypad.held = {pos}
-    assert g._read_keypad() is True            # 중단 신호
+    g._read_keypad()                           # 더 이상 중단하지 않음
+    assert g.engine.hits == 1 and 0 not in g.engine.moles   # 0번 칸을 정상으로 침
