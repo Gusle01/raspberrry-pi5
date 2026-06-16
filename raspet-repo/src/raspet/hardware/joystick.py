@@ -59,9 +59,17 @@ class Joystick:
         return "up" if y > 0 else "down"
 
     def pressed(self) -> bool:
-        """조이스틱 버튼이 눌렸는지. ADC 버튼이 있으면 임계값으로, 없으면 GPIO로 판정."""
+        """조이스틱 버튼이 눌렸는지. ADC 버튼이 있으면 임계값으로, 없으면 GPIO로 판정.
+
+        ADC(CH0)는 풀업이 없어 안 누른 상태에서도 값이 출렁인다. 단일 표본으로
+        판정하면 순간 튐에 헛인식하므로, 여러 번 읽어 *중앙값*이 임계 미만일 때만
+        눌림으로 본다(중앙값은 한두 표본의 스파이크에 흔들리지 않는다).
+        """
         if self._adc_button is not None:
-            return self._adc_button.value < config.ADC_BUTTON_PRESSED_BELOW
+            n = max(1, getattr(config, "ADC_BUTTON_SAMPLES", 5))
+            vals = sorted(self._adc_button.value for _ in range(n))
+            median = vals[n // 2]
+            return median < config.ADC_BUTTON_PRESSED_BELOW
         return bool(self._button and self._button.is_pressed)
 
 

@@ -57,6 +57,30 @@ def test_joystick_sw_confirm_even_when_tilted():
     assert "a" in ctx.poll()
 
 
+def test_adc_button_median_debounce():
+    # 풀업 없는 CH0: 5표본 중앙값으로 순간 튐을 걸러 눌림/뗌을 판정한다.
+    from raspet.hardware.joystick import Joystick
+
+    class _FakeADC:
+        def __init__(self, seq):
+            self._seq, self._i = list(seq), 0
+
+        @property
+        def value(self):
+            v = self._seq[self._i % len(self._seq)]
+            self._i += 1
+            return v
+
+    j = Joystick.__new__(Joystick)        # __init__(하드웨어) 우회
+    j._button = None
+    # 대부분 0(누름) + 스파이크 1개 → 중앙값 0 → 눌림
+    j._adc_button = _FakeADC([0.0, 0.0, 0.5, 0.0, 0.0])
+    assert j.pressed() is True
+    # 대부분 높음(뗌) + 순간 0 하나 → 중앙값 높음 → 안 눌림(헛인식 방지)
+    j._adc_button = _FakeADC([0.40, 0.45, 0.0, 0.42, 0.40])
+    assert j.pressed() is False
+
+
 class _FakeLeds:
     available = True
 
