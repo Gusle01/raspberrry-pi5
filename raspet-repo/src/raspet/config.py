@@ -68,8 +68,8 @@ FONT_SIZE_SMALL = 8        # 메뉴 등 항목이 많은 목록용
 PIN_ULTRASONIC_TRIG = 23
 PIN_ULTRASONIC_ECHO = 24
 PIN_BUZZER = 18
-# 조이스틱은 MCP3008 ADC의 채널 번호로 지정
-ADC_CHANNEL_X = 0
+# 조이스틱은 MCP3008 ADC의 채널 번호로 지정 (실제 배선: VRx=CH2, VRy=CH1)
+ADC_CHANNEL_X = 2
 ADC_CHANNEL_Y = 1
 PIN_JOYSTICK_BUTTON = 25    # 조이스틱 누름 버튼 (선택)
 # 두더지 잡기용 LED·버튼 (BCM). 사용 중 핀(I2C 2·3, 부저 18, 초음파 23·24, 조이스틱 25,
@@ -130,8 +130,8 @@ KEYPAD_MENU_ACTIONS = {
 KEYPAD_BACK_KEY = "1"     # 게임 중 이 키(S1) = 뒤로/종료
 
 # ── 환경 센서 (조도 + 온도, 로드맵 확장) ─────────────────
-# 조도센서(LDR)는 조이스틱과 같은 MCP3008(SPI)의 빈 채널에 연결한다(0·1은 조이스틱).
-ADC_CHANNEL_LIGHT = 2
+# 조도센서(LDR)는 조이스틱과 같은 MCP3008(SPI)의 빈 채널에 연결한다(CH1=VRy, CH2=VRx).
+ADC_CHANNEL_LIGHT = 3
 # 조도값(0.0=캄캄 ~ 1.0=매우 밝음) 판정 기준. 히스테리시스로 경계에서의 깜빡임을 막는다.
 LIGHT_DARK_BELOW = 0.30     # 이 값 이하로 어두워지면 '밤'으로 보고 펫이 잠든다
 LIGHT_LIGHT_ABOVE = 0.45    # 이 값 이상으로 밝아지면 '낮'으로 보고 펫이 깬다

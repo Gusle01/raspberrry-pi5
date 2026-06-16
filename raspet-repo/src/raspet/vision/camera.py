@@ -16,6 +16,10 @@ class Camera:
     def __init__(self) -> None:
         self._cam = None
         if _CAM_AVAILABLE:
+            # 센서가 실제로 붙어 있지 않으면 Picamera2() 생성자가 멈추거나
+            # 예외를 던지므로, 먼저 빠르게 카메라 목록을 확인한다.
+            if not Picamera2.global_camera_info():
+                raise RuntimeError("No cameras available")
             self._cam = Picamera2()
             cfg = self._cam.create_preview_configuration(
                 main={"format": "RGB888", "size": (640, 480)})
