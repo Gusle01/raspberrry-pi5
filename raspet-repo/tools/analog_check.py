@@ -30,6 +30,16 @@ print(f"채널: X={config.ADC_CHANNEL_X} Y={config.ADC_CHANNEL_Y} "
 print(f"데드존={config.JOYSTICK_DEADZONE} LIGHT_INVERT={config.LIGHT_INVERT} "
       f"밤판정임계={config.LIGHT_DARK_BELOW}")
 
+# SW(ADC) 원시값 직접 읽기 — 눌림/뗌 값을 보고 ADC_BUTTON_PRESSED_BELOW를 보정한다.
+_sw_adc = None
+_btn_ch = getattr(config, "ADC_CHANNEL_BUTTON", None)
+if _btn_ch is not None and _GPIO_AVAILABLE:
+    try:
+        from gpiozero import MCP3008
+        _sw_adc = MCP3008(channel=_btn_ch)
+    except Exception:
+        _sw_adc = None
+
 joy = create_joystick()
 env = Environment()
 print(f"\n조이스틱: {type(joy).__name__} available={joy.available} | "
@@ -45,6 +55,8 @@ try:
         if joy.available:
             x, y = joy.read()
             line += f"x={x:+.2f} y={y:+.2f} dir={joy.direction():>6} press={joy.pressed()!s:5} "
+            if _sw_adc is not None:
+                line += f"sw_adc={_sw_adc.value:.3f} "
         if env.light_available:
             lv = env.light()
             night = lv is not None and lv <= config.LIGHT_DARK_BELOW

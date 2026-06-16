@@ -71,7 +71,13 @@ PIN_BUZZER = 18
 # 조이스틱은 MCP3008 ADC의 채널 번호로 지정 (실제 배선: VRx=CH2, VRy=CH1)
 ADC_CHANNEL_X = 2
 ADC_CHANNEL_Y = 1
-PIN_JOYSTICK_BUTTON = 25    # 조이스틱 누름 버튼 (선택)
+# 조이스틱 누름(SW)을 읽는 방식.
+#  • ADC_CHANNEL_BUTTON 가 None 이 아니면: SW를 MCP3008의 그 채널(아날로그)에서 읽는다.
+#    (실제 배선: SW→MCP3008 CH0. SW는 눌리면 GND로 떨어지므로 값이 낮아진다.)
+#  • None 이면: PIN_JOYSTICK_BUTTON(GPIO 디지털, 내장 풀업)로 읽는다.
+ADC_CHANNEL_BUTTON = 0
+ADC_BUTTON_PRESSED_BELOW = 0.5   # ADC SW 값이 이 미만이면 '눌림'으로 본다(폴라리티 보정용)
+PIN_JOYSTICK_BUTTON = 25    # ADC_CHANNEL_BUTTON 가 None 일 때만 사용하는 GPIO 핀
 # 두더지 잡기용 LED·버튼 (BCM). 사용 중 핀(I2C 2·3, 부저 18, 초음파 23·24, 조이스틱 25,
 # SPI 7~11)과 겹치지 않게 배치. 위치(왼/가운데/오른쪽)는 버튼 ←↓→에 대응한다.
 PIN_LEDS = [5, 6, 13, 19]   # LED 4개 (각 220~330Ω 저항 → LED → GND). 5·6·13=기존 3구멍,
@@ -132,9 +138,12 @@ KEYPAD_BACK_KEY = "1"     # 게임 중 이 키(S1) = 뒤로/종료
 # ── 환경 센서 (조도 + 온도, 로드맵 확장) ─────────────────
 # 조도센서(LDR)는 조이스틱과 같은 MCP3008(SPI)의 빈 채널에 연결한다(CH1=VRy, CH2=VRx).
 ADC_CHANNEL_LIGHT = 3
-# 조도값(0.0=캄캄 ~ 1.0=매우 밝음) 판정 기준. 히스테리시스로 경계에서의 깜빡임을 막는다.
-LIGHT_DARK_BELOW = 0.30     # 이 값 이하로 어두워지면 '밤'으로 보고 펫이 잠든다
-LIGHT_LIGHT_ABOVE = 0.45    # 이 값 이상으로 밝아지면 '낮'으로 보고 펫이 깬다
+# 조도값(0.0=캄캄 ~ 1.0=매우 밝음) 판정 기준.
+# 실측 보정(이 LDR+분압 기준): 센서를 가리면 ~0.00~0.02, 일반 실내 ~0.08~0.21,
+# 손전등 직사 ~0.40(최대). 손전등을 직접 비춰도 0.45까지 안 올라가므로 기준을 낮춘다.
+# day/night 판정은 is_dark()의 LIGHT_DARK_BELOW 하나만 사용한다(아래 ABOVE는 미사용).
+LIGHT_DARK_BELOW = 0.05     # 이 값 이하로 어두워지면(가림/소등) '밤'으로 보고 펫이 잠든다
+LIGHT_LIGHT_ABOVE = 0.10    # (현재 코드 미사용) 향후 히스테리시스용 상단 기준
 # 분압 배선(LDR-저항 위치)에 따라 밝을수록 ADC 값이 작아질 수 있다. True면 값을 반전한다.
 LIGHT_INVERT = False
 

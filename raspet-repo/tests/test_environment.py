@@ -42,9 +42,10 @@ def test_env_reading_defaults_are_none():
 
 
 def test_is_dark_uses_threshold():
-    assert EnvReading(light=0.1).is_dark() is True
-    assert EnvReading(light=0.9).is_dark() is False
-    assert EnvReading(light=config.LIGHT_DARK_BELOW).is_dark() is True   # 경계 포함(<=)
+    thr = config.LIGHT_DARK_BELOW
+    assert EnvReading(light=thr / 2).is_dark() is True       # 임계값보다 어두움
+    assert EnvReading(light=thr + 0.5).is_dark() is False    # 임계값보다 밝음
+    assert EnvReading(light=thr).is_dark() is True           # 경계 포함(<=)
 
 
 def test_mood_signals_shape():

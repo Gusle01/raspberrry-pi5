@@ -20,11 +20,16 @@ class Joystick:
     def __init__(self) -> None:
         self._adc_x = None
         self._adc_y = None
-        self._button = None
+        self._button = None      # GPIO 디지털 버튼
+        self._adc_button = None  # ADC(아날로그) 버튼
         if _GPIO_AVAILABLE:
             self._adc_x = MCP3008(channel=config.ADC_CHANNEL_X)
             self._adc_y = MCP3008(channel=config.ADC_CHANNEL_Y)
-            if config.PIN_JOYSTICK_BUTTON is not None:
+            btn_ch = getattr(config, "ADC_CHANNEL_BUTTON", None)
+            if btn_ch is not None:
+                # SW를 같은 MCP3008의 아날로그 채널에서 읽는다(배선에 맞춤).
+                self._adc_button = MCP3008(channel=btn_ch)
+            elif config.PIN_JOYSTICK_BUTTON is not None:
                 self._button = Button(config.PIN_JOYSTICK_BUTTON)
 
     @property
@@ -52,7 +57,9 @@ class Joystick:
         return "up" if y > 0 else "down"
 
     def pressed(self) -> bool:
-        """조이스틱 버튼이 눌렸는지."""
+        """조이스틱 버튼이 눌렸는지. ADC 버튼이 있으면 임계값으로, 없으면 GPIO로 판정."""
+        if self._adc_button is not None:
+            return self._adc_button.value < config.ADC_BUTTON_PRESSED_BELOW
         return bool(self._button and self._button.is_pressed)
 
 
@@ -63,6 +70,7 @@ class DummyJoystick(Joystick):
         self._adc_x = None
         self._adc_y = None
         self._button = None
+        self._adc_button = None
 
 
 def create_joystick() -> Joystick:
