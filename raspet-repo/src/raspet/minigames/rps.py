@@ -11,6 +11,7 @@ import random
 
 from .base import MiniGame
 from .. import config
+from ..vision.hand import majority_gesture
 
 CHOICES = ("rock", "scissors", "paper")
 _LABEL = {"rock": "바위", "scissors": "가위", "paper": "보"}
@@ -115,11 +116,21 @@ class RockPaperScissors(MiniGame):
             ctx.seg_show_seconds(remain)             # 7세그먼트: 남은 시간
             ctx.present()
 
-        # 카운트다운 종료 → "찰칵!" 그 순간의 프레임을 캡처해 최종 확정한다.
-        final_frame = ctx.capture_frame()
-        final = hand.classify_gesture(final_frame)
+        # 카운트다운 종료 → "찰칵!" 여러 프레임을 모아 다수결로 최종 확정한다.
+        # 단일 프레임은 흔들림/노이즈로 오인식하기 쉬우므로 짧은 구간을 표본화한다.
         ctx.beep(freq=1320, duration=0.08)           # 셔터음
-        ctx.show_camera(final_frame, label="찰칵!")
+        votes = []
+        first_frame = None
+        for i in range(config.RPS_CAPTURE_SAMPLES):
+            if not ctx.running:
+                break
+            frame = ctx.capture_frame()
+            if first_frame is None:
+                first_frame = frame
+            votes.append(hand.classify_gesture(frame))
+            ctx.tick()                               # 프레임 간 간격 확보(FPS 제한)
+        final = majority_gesture(votes)
+        ctx.show_camera(first_frame, label="찰칵!")
         ctx.clear()
         ctx.text("찰칵!", ctx.width // 2, 8, color=config.COLOR_ACCENT,
                  big=True, center=True)

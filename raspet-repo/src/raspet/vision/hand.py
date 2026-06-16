@@ -21,6 +21,20 @@ except Exception:
     _CV_AVAILABLE = False
 
 
+def majority_gesture(gestures):
+    """여러 프레임의 인식 결과 중 최빈 제스처를 반환한다.
+
+    단일 프레임은 흔들림/노이즈로 오인식하기 쉬우므로, 짧은 구간 동안 모은 여러
+    인식 결과를 다수결로 합쳐 안정성을 높인다. 유효 인식이 하나도 없으면 None.
+    동점이면 먼저 등장한 제스처를 택한다(Counter가 등장 순서를 보존).
+    """
+    from collections import Counter
+    valid = [g for g in gestures if g in ("rock", "scissors", "paper")]
+    if not valid:
+        return None
+    return Counter(valid).most_common(1)[0][0]
+
+
 def fingers_to_gesture(n: int) -> str:
     """펴진 손가락 수를 가위바위보 제스처로 매핑한다."""
     if n <= 1:

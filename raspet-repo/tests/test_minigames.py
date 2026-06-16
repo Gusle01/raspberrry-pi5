@@ -7,6 +7,7 @@ import random
 import pytest
 
 from raspet.minigames.rps import judge, CHOICES
+from raspet.vision.hand import majority_gesture, fingers_to_gesture
 from raspet.minigames.snake import SnakeEngine
 from raspet.minigames.jump import JumpEngine, Obstacle, height_from_distance
 from raspet.minigames.color_hunt import color_match, _CV_AVAILABLE
@@ -21,6 +22,25 @@ def test_rps_judge_all_cases():
     for u in CHOICES:
         for c in CHOICES:
             assert judge(u, c) in ("win", "lose", "draw")
+
+
+def test_rps_majority_vote():
+    # 다수결: 노이즈 1표가 섞여도 최빈값을 고른다.
+    assert majority_gesture(["rock", "rock", "scissors"]) == "rock"
+    # None/무효 인식은 무시한다.
+    assert majority_gesture([None, "paper", None, "paper"]) == "paper"
+    # 유효 인식이 하나도 없으면 None.
+    assert majority_gesture([None, None, "bogus"]) is None
+    assert majority_gesture([]) is None
+    # 동점이면 먼저 등장한 제스처를 택한다.
+    assert majority_gesture(["scissors", "rock"]) == "scissors"
+
+
+def test_fingers_to_gesture_mapping():
+    assert fingers_to_gesture(0) == "rock"
+    assert fingers_to_gesture(1) == "rock"
+    assert fingers_to_gesture(2) == "scissors"
+    assert fingers_to_gesture(5) == "paper"
 
 
 # ── 스네이크 ─────────────────────────────────────────────
