@@ -170,9 +170,15 @@ source .venv/bin/activate
 # 3) 의존성 설치
 pip install -r requirements.txt
 
-# 4) 실행
-python main.py
+# 4) 실행 (둘 중 하나)
+./run.sh          # venv 파이썬으로 실행하는 런처(권장)
+python main.py    # venv를 activate 한 상태에서
 ```
+
+> ⚠️ **`python3 main.py`처럼 venv 밖에서 직접 실행하지 마세요.** 시스템 파이썬에는
+> `OpenCV(cv2)`가 없어서 카메라 게임이 반쪽만 돕니다 — 카메라 미리보기 창이 안 뜨고,
+> 가위바위보는 손 인식 대신 버튼으로 폴백, 색깔 찾기는 색 검출이 동작하지 않습니다.
+> 항상 `./run.sh`(venv 자동 사용) 또는 venv activate 후 실행하세요.
 
 > 💡 `picamera2`는 Raspberry Pi OS에 기본 포함되어 있어 보통 `sudo apt install -y python3-picamera2`로 설치합니다.
 > `MediaPipe`는 aarch64 환경에서 설치 제약이 있을 수 있으며, 이 경우 OpenCV 윤곽선 기반 대체 방식을 사용합니다. (자세한 내용은 `docs/project-plan.md` 5.1절)
