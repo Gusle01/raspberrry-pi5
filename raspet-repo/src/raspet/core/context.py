@@ -118,6 +118,7 @@ class GameContext:
         self.clock = pygame.time.Clock()
         self._actions: set[str] = set()
         self._prev_dir = "center"   # 조이스틱 엣지 검출용
+        self._prev_pressed = False  # 조이스틱 SW 엣지 검출용(연타 방지)
         # 물리 버튼(인덱스)→행동 매핑. 평소엔 메뉴(확인/뒤로), 미니게임은 set_button_actions로 전환.
         self._button_actions = self._menu_button_actions()
         # 키패드 모드: "menu"면 poll()이 키패드를 메뉴 행동으로 변환, "grid"면 게임이 직접 읽음.
@@ -179,9 +180,13 @@ class GameContext:
             d = joy.direction()
             if d != "center" and d != self._prev_dir:
                 self._actions.add(d)
-            if d == "center" and joy.pressed():
-                self._actions.add("a")
             self._prev_dir = d
+            # SW(스위치): 핀이 0이 되어 '안 눌림→눌림'으로 바뀌는 순간만 확인(a).
+            # 레벨이 아닌 엣지로 봐서, 누르고 있는 동안 확인이 연타되지 않게 한다.
+            now_pressed = joy.pressed()
+            if now_pressed and not self._prev_pressed:
+                self._actions.add("a")
+            self._prev_pressed = now_pressed
 
         # 물리 버튼(있으면): 눌린 순간을 현재 매핑(_button_actions)의 행동으로.
         # 평소엔 확인/뒤로(메뉴), 두더지 잡기 중엔 구멍(left/down/right)으로 바뀐다.

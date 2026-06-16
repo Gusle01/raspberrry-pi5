@@ -17,6 +17,46 @@ class _FakeButtons:
         return e
 
 
+class _FakeJoystick:
+    available = True
+
+    def __init__(self):
+        self._dir = "center"
+        self._pressed = False
+
+    def direction(self):
+        return self._dir
+
+    def pressed(self):
+        return self._pressed
+
+
+def test_joystick_sw_press_is_confirm_edge():
+    fj = _FakeJoystick()
+    ctx = GameContext(hardware={"joystick": fj}, headless=True)
+    # 안 눌림 → 확인 없음
+    assert "a" not in ctx.poll()
+    # 스위치가 0이 되어 눌림 → 확인(a) 1회
+    fj._pressed = True
+    assert "a" in ctx.poll()
+    # 계속 눌려 있어도 엣지는 1회뿐(연타 방지)
+    assert "a" not in ctx.poll()
+    # 뗐다가 다시 누르면 또 확인
+    fj._pressed = False; ctx.poll()
+    fj._pressed = True
+    assert "a" in ctx.poll()
+
+
+def test_joystick_sw_confirm_even_when_tilted():
+    # center가 아니어도(스틱을 민 채로) 눌리면 확인이 된다.
+    fj = _FakeJoystick()
+    fj._dir = "right"
+    ctx = GameContext(hardware={"joystick": fj}, headless=True)
+    ctx.poll()                       # 'right' 엣지 소비
+    fj._pressed = True
+    assert "a" in ctx.poll()
+
+
 class _FakeLeds:
     available = True
 
