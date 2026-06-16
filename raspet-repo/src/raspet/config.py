@@ -223,7 +223,7 @@ OMOK_LOSE_REWARD = 5        # 패배 시 위로 재화
 RPS_ROUNDS = 3             # 3판 2선승
 RPS_WIN_REWARD = 8         # 라운드 승리당 재화
 RPS_MATCH_BONUS = 10       # 매치(세트) 승리 보너스
-RPS_CAMERA_SECONDS = 4     # 카메라에 손을 보여줄 시간(초). 이 안에 인식되면 그 손을 낸다.
+RPS_CAMERA_SECONDS = 6     # 카메라에 손을 보여줄 시간(초). 이 안에 인식되면 그 손을 낸다.
 
 # ── 스네이크 ─────────────────────────────────────────
 SNAKE_COLS = 16
