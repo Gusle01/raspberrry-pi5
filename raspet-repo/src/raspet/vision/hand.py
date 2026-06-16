@@ -113,13 +113,18 @@ class HandRecognizer:
             return None
         return fingers_to_gesture(count)
 
-    @staticmethod
-    def _count_fingers_opencv(frame):
-        """피부색 마스킹 → 최대 윤곽선 → 볼록결함으로 손가락 수를 추정한다.
+    # OpenCV 백엔드 임계값(진단 도구 tools/rps_probe.py 로 실측·보정)
+    OPENCV_MIN_AREA = 3000      # 손으로 인정할 최소 윤곽 면적(px)
+    OPENCV_ROCK_SOLIDITY = 0.90  # 이 이상이면 주먹으로 직결
+    OPENCV_DEFECT_DEPTH = 20     # 손가락 사이 골로 인정할 최소 깊이(px)
 
-        주먹은 손가락 사이 골이 없어 defect만으로는 0/2가 오락가락한다. 그래서
-        solidity(윤곽면적/볼록껍질면적)를 먼저 본다 — 주먹은 꽉 차서 solidity가
-        높고, 손가락을 펴면 손가락 사이 빈 공간 때문에 낮아진다. 높으면 바위로 직결.
+    @classmethod
+    def analyze_opencv(cls, frame):
+        """OpenCV 경로의 중간 신호까지 모두 담은 진단 dict를 돌려준다.
+
+        반환: {count, area, solidity, deep, reason}. count가 None이면 손 미검출.
+        실제 분류(_count_fingers_opencv)와 진단 도구가 같은 로직을 공유하도록
+        단일 소스로 둔다. reason은 어떤 규칙으로 count가 정해졌는지 설명.
         """
         ycrcb = cv2.cvtColor(frame, cv2.COLOR_RGB2YCrCb)
         mask = cv2.inRange(ycrcb, (0, 133, 77), (255, 173, 127))
@@ -130,33 +135,49 @@ class HandRecognizer:
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
                                        cv2.CHAIN_APPROX_SIMPLE)
+        info = {"count": None, "area": 0.0, "solidity": 0.0,
+                "deep": 0, "reason": "no-contour"}
         if not contours:
-            return None
+            return info
         cnt = max(contours, key=cv2.contourArea)
         area = cv2.contourArea(cnt)
-        if area < 3000:
-            return None
+        info["area"] = area
+        if area < cls.OPENCV_MIN_AREA:
+            info["reason"] = "area<min"
+            return info
         hull_pts = cv2.convexHull(cnt)
         hull_area = cv2.contourArea(hull_pts)
         solidity = area / hull_area if hull_area > 0 else 1.0
+        info["solidity"] = solidity
         # 꽉 찬 손모양(solidity 높음) = 주먹. 펴진 손가락은 골 때문에 낮아진다.
-        if solidity > 0.90:
-            return 0
+        if solidity > cls.OPENCV_ROCK_SOLIDITY:
+            info.update(count=0, reason="solidity→rock")
+            return info
         hull = cv2.convexHull(cnt, returnPoints=False)
         if hull is None or len(hull) < 3:
-            return 0
+            info.update(count=0, reason="no-hull→rock")
+            return info
         defects = cv2.convexityDefects(cnt, hull)
         if defects is None:
-            return 0
+            info.update(count=0, reason="no-defects→rock")
+            return info
         # 손가락 사이의 깊은 골(defect) 개수 + 1 ≈ 펴진 손가락 수
         deep = 0
         for i in range(defects.shape[0]):
             depth = defects[i, 0, 3] / 256.0
-            if depth > 20:
+            if depth > cls.OPENCV_DEFECT_DEPTH:
                 deep += 1
+        info["deep"] = deep
         if deep == 0:          # 골이 전혀 없으면 주먹으로 본다
-            return 0
-        return min(deep + 1, 5)
+            info.update(count=0, reason="deep=0→rock")
+            return info
+        info.update(count=min(deep + 1, 5), reason="deep+1")
+        return info
+
+    @classmethod
+    def _count_fingers_opencv(cls, frame):
+        """피부색 마스킹 → 윤곽선·solidity·볼록결함으로 손가락 수를 추정한다."""
+        return cls.analyze_opencv(frame)["count"]
 
 
 def create_hand_recognizer(use_mediapipe: bool = True) -> HandRecognizer:
