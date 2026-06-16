@@ -72,15 +72,15 @@ PIN_BUZZER = 18
 ADC_CHANNEL_X = 2
 ADC_CHANNEL_Y = 1
 # 조이스틱 누름(SW)을 읽는 방식.
-#  • ADC_CHANNEL_BUTTON 가 None 이 아니면: SW를 MCP3008의 그 채널(아날로그)에서 읽는다.
-#  • None 이면: PIN_JOYSTICK_BUTTON(GPIO 디지털, 내장 풀업)로 읽는다.
-# ⚠ SW를 풀업 없이 MCP3008 CH0로 읽는 구성. 실측상 누르면 0.0 근처로 확실히
-#   떨어지고 뗌은 ~0.4 부근이라 'CH0 < 임계 = 눌림'으로 판정한다. 단 풀업이 없어
-#   뗌 값이 환경(손 거리·습도)에 따라 출렁이므로 pressed()는 여러 표본의 중앙값으로
-#   순간 튐을 거른다. 그래도 가끔 헛인식이 나면 풀업저항(약 10kΩ, CH0↔3.3V)을 권장.
-ADC_CHANNEL_BUTTON = 0     # SW를 MCP3008 CH0(아날로그)에서 읽는다
-ADC_BUTTON_PRESSED_BELOW = 0.2   # CH0 값이 이 미만이면 '눌림'(실측: 누름≤0.08, 뗌≥0.38)
-ADC_BUTTON_SAMPLES = 5     # floating 잡음 억제 — 이 개수만큼 읽어 중앙값으로 판정
+#  • None 이면: PIN_JOYSTICK_BUTTON(GPIO 디지털, 내장 풀업)로 읽는다. ← 권장(깔끔)
+#  • None 이 아니면: SW를 MCP3008의 그 채널(아날로그)에서 읽는다.
+# ⚠ ADC(CH0) 방식은 풀업이 없으면 안 누를 때 값이 떠다녀(floating) 눌림/뗌 구분이
+#   불안정했다(0.0~0.5 출렁). 그래서 SW를 GPIO로 옮겨 내부 풀업으로 읽는다.
+#   배선: 조이스틱 SW → GPIO25(물리 22핀), 조이스틱 GND → GND. (눌림=0, 뗌=1)
+#   ADC로 다시 쓰려면 CH0↔3.3V에 풀업저항(약 10kΩ)을 달고 아래를 0으로 되돌린다.
+ADC_CHANNEL_BUTTON = None   # GPIO 방식 사용(아래 PIN_JOYSTICK_BUTTON). ADC로 쓰려면 채널 번호.
+ADC_BUTTON_PRESSED_BELOW = 0.2   # (ADC 방식일 때) 이 값 미만이면 '눌림'
+ADC_BUTTON_SAMPLES = 5     # (ADC 방식일 때) floating 잡음 억제용 중앙값 표본 수
 PIN_JOYSTICK_BUTTON = 25    # ADC_CHANNEL_BUTTON 가 None 일 때 쓰는 GPIO 핀(내장 풀업)
 # 두더지 잡기용 LED·버튼 (BCM). 사용 중 핀(I2C 2·3, 부저 18, 초음파 23·24, 조이스틱 25,
 # SPI 7~11)과 겹치지 않게 배치. 위치(왼/가운데/오른쪽)는 버튼 ←↓→에 대응한다.
