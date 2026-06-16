@@ -7,7 +7,8 @@ import random
 import pytest
 
 from raspet.minigames.rps import judge, CHOICES
-from raspet.vision.hand import majority_gesture, fingers_to_gesture
+from raspet.vision.hand import (
+    majority_gesture, fingers_to_gesture, HandRecognizer)
 from raspet.minigames.snake import SnakeEngine
 from raspet.minigames.jump import JumpEngine, Obstacle, height_from_distance
 from raspet.minigames.color_hunt import color_match, _CV_AVAILABLE
@@ -41,6 +42,61 @@ def test_fingers_to_gesture_mapping():
     assert fingers_to_gesture(1) == "rock"
     assert fingers_to_gesture(2) == "scissors"
     assert fingers_to_gesture(5) == "paper"
+
+
+class _LM:
+    """MediaPipe 랜드마크 흉내 (x, y만 사용)."""
+    def __init__(self, x, y):
+        self.x, self.y = x, y
+        self.z = 0.0
+
+
+def _make_hand(index, middle, ring, pinky, thumb, rot_deg=0.0):
+    """펴짐 여부(bool)로 21개 랜드마크를 만든다. rot_deg로 손 전체를 회전.
+
+    손목(0)을 (0.5,1.0)에 두고 손가락은 위(y 감소)로 뻗는다. 펴진 손가락은
+    tip을 손목에서 멀리, 굽힌 손가락은 손바닥 쪽으로 접어 가깝게 둔다.
+    """
+    import math
+    pts = {0: (0.5, 1.0)}
+    cols = {"index": (5, 6, 8, 0.40), "middle": (9, 10, 12, 0.50),
+            "ring": (13, 14, 16, 0.60), "pinky": (17, 18, 20, 0.70)}
+    up = {"index": index, "middle": middle, "ring": ring, "pinky": pinky}
+    for name, (mcp, pip, tip, x) in cols.items():
+        pts[mcp] = (x, 0.70)
+        pts[pip] = (x, 0.55)
+        pts[tip] = (x, 0.35) if up[name] else (x, 0.65)  # 굽히면 손목 쪽으로
+    # 엄지: 2(mcp),3(ip),4(tip). 펴면 왼쪽 바깥, 굽히면 손바닥 안쪽.
+    pts[2] = (0.35, 0.78)
+    pts[3] = (0.30, 0.74) if thumb else (0.37, 0.74)
+    pts[4] = (0.20, 0.72) if thumb else (0.42, 0.72)
+    # 빈 인덱스 채우기(미사용)
+    for i in range(21):
+        pts.setdefault(i, (0.5, 0.9))
+    # 회전(임의 중심 기준 강체 회전 → 거리 기반 판정은 불변이어야 함)
+    a = math.radians(rot_deg)
+    ca, sa = math.cos(a), math.sin(a)
+    cx, cy = 0.5, 0.6
+    out = []
+    for i in range(21):
+        x, y = pts[i]
+        dx, dy = x - cx, y - cy
+        out.append(_LM(cx + dx * ca - dy * sa, cy + dx * sa + dy * ca))
+    return out
+
+
+def test_count_fingers_rotation_invariant():
+    count = HandRecognizer._count_fingers_mediapipe
+    fist = _make_hand(False, False, False, False, thumb=False)
+    openh = _make_hand(True, True, True, True, thumb=True)
+    sciss = _make_hand(True, True, False, False, thumb=False)
+    assert fingers_to_gesture(count(fist)) == "rock"
+    assert fingers_to_gesture(count(openh)) == "paper"
+    assert fingers_to_gesture(count(sciss)) == "scissors"
+    # 손을 눕혀도(90°·45°) 주먹은 여전히 바위여야 한다 — 회전 불변.
+    for deg in (45, 90, 135, 180):
+        tilted = _make_hand(False, False, False, False, thumb=False, rot_deg=deg)
+        assert fingers_to_gesture(count(tilted)) == "rock"
 
 
 # ── 스네이크 ─────────────────────────────────────────────

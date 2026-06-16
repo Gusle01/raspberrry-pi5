@@ -7,6 +7,8 @@
 펴진 손가락 개수 → 제스처
   0~1개 = 바위(rock), 2~3개 = 가위(scissors), 4~5개 = 보(paper)
 """
+import math
+
 try:
     import mediapipe as mp
     _MP_AVAILABLE = True
@@ -85,17 +87,23 @@ class HandRecognizer:
     def _count_fingers_mediapipe(lm) -> int:
         """랜드마크에서 펴진 손가락 수를 센다.
 
-        검지~새끼: 끝(tip)이 둘째 마디(pip)보다 위(y가 작음)이면 펴진 것.
-        엄지: 끝이 관절보다 바깥(x)으로 나가면 펴진 것(대략).
+        손이 기울어져도 동작하도록 y좌표 대신 *손목(landmark 0)까지의 거리*로
+        판정한다. 펴진 손가락은 끝(tip)이 둘째 마디(pip)보다 손목에서 멀다 —
+        이 관계는 손의 회전과 무관하므로, 주먹을 눕혀도 가위로 튀지 않는다.
+
+        엄지: 손가락처럼 말리지 않으므로 끝(4)이 검지 밑동(5)에서 충분히
+        떨어졌는지로 판정한다. 주먹 쥐면 엄지 끝이 손바닥 쪽으로 접혀 가까워진다.
         """
-        tips = [8, 12, 16, 20]
-        pips = [6, 10, 14, 18]
+        def d(a, b):
+            return math.hypot(lm[a].x - lm[b].x, lm[a].y - lm[b].y)
+
         count = 0
-        for tip, pip in zip(tips, pips):
-            if lm[tip].y < lm[pip].y:
+        # 검지~새끼: tip이 pip보다 손목(0)에서 멀면 펴진 것
+        for tip, pip in ((8, 6), (12, 10), (16, 14), (20, 18)):
+            if d(tip, 0) > d(pip, 0):
                 count += 1
-        # 엄지(좌우 방향 비교)
-        if abs(lm[4].x - lm[2].x) > abs(lm[3].x - lm[2].x):
+        # 엄지: 끝(4)-검지밑동(5) 거리가 IP관절(3)-검지밑동(5)보다 크면 펴진 것
+        if d(4, 5) > d(3, 5):
             count += 1
         return count
 
@@ -107,17 +115,33 @@ class HandRecognizer:
 
     @staticmethod
     def _count_fingers_opencv(frame):
-        """피부색 마스킹 → 최대 윤곽선 → 볼록결함으로 손가락 수를 추정한다."""
+        """피부색 마스킹 → 최대 윤곽선 → 볼록결함으로 손가락 수를 추정한다.
+
+        주먹은 손가락 사이 골이 없어 defect만으로는 0/2가 오락가락한다. 그래서
+        solidity(윤곽면적/볼록껍질면적)를 먼저 본다 — 주먹은 꽉 차서 solidity가
+        높고, 손가락을 펴면 손가락 사이 빈 공간 때문에 낮아진다. 높으면 바위로 직결.
+        """
         ycrcb = cv2.cvtColor(frame, cv2.COLOR_RGB2YCrCb)
         mask = cv2.inRange(ycrcb, (0, 133, 77), (255, 173, 127))
         mask = cv2.GaussianBlur(mask, (5, 5), 0)
+        # 잡음/구멍 정리: 열림→닫힘으로 마스크 안정화
+        kernel = np.ones((5, 5), np.uint8)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL,
                                        cv2.CHAIN_APPROX_SIMPLE)
         if not contours:
             return None
         cnt = max(contours, key=cv2.contourArea)
-        if cv2.contourArea(cnt) < 3000:
+        area = cv2.contourArea(cnt)
+        if area < 3000:
             return None
+        hull_pts = cv2.convexHull(cnt)
+        hull_area = cv2.contourArea(hull_pts)
+        solidity = area / hull_area if hull_area > 0 else 1.0
+        # 꽉 찬 손모양(solidity 높음) = 주먹. 펴진 손가락은 골 때문에 낮아진다.
+        if solidity > 0.90:
+            return 0
         hull = cv2.convexHull(cnt, returnPoints=False)
         if hull is None or len(hull) < 3:
             return 0
@@ -130,6 +154,8 @@ class HandRecognizer:
             depth = defects[i, 0, 3] / 256.0
             if depth > 20:
                 deep += 1
+        if deep == 0:          # 골이 전혀 없으면 주먹으로 본다
+            return 0
         return min(deep + 1, 5)
 
 
