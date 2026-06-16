@@ -85,6 +85,16 @@ def _make_hand(index, middle, ring, pinky, thumb, rot_deg=0.0):
     return out
 
 
+def test_defect_angle_filters_wide_valleys():
+    ang = HandRecognizer._defect_angle
+    # 손가락 사이의 좁은 V자 골 → 작은 각(< 90°, 손가락으로 인정)
+    assert ang((0, 0), (5, 10), (10, 0)) < 90
+    # 팔·손목처럼 거의 일직선인 넓은 골 → 큰 각(> 90°, 제외)
+    assert ang((0, 0), (50, 5), (100, 0)) > 90
+    # 퇴화(거리 0)면 180°로 안전 처리(제외)
+    assert ang((0, 0), (0, 0), (10, 0)) == 180.0
+
+
 def test_count_fingers_rotation_invariant():
     count = HandRecognizer._count_fingers_mediapipe
     fist = _make_hand(False, False, False, False, thumb=False)

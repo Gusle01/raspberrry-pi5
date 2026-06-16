@@ -114,9 +114,26 @@ class HandRecognizer:
         return fingers_to_gesture(count)
 
     # OpenCV 백엔드 임계값(진단 도구 tools/rps_probe.py 로 실측·보정)
-    OPENCV_MIN_AREA = 3000      # 손으로 인정할 최소 윤곽 면적(px)
+    OPENCV_MIN_AREA = 3000       # 손으로 인정할 최소 윤곽 면적(px)
     OPENCV_ROCK_SOLIDITY = 0.90  # 이 이상이면 주먹으로 직결
     OPENCV_DEFECT_DEPTH = 20     # 손가락 사이 골로 인정할 최소 깊이(px)
+    OPENCV_DEFECT_ANGLE = 90     # 골의 두 변이 이루는 각이 이 값(도) 이하라야 손가락 사이
+
+    @staticmethod
+    def _defect_angle(start, far, end):
+        """골(far)에서 양 손가락 끝(start,end)을 바라보는 사잇각(도)을 구한다.
+
+        진짜 손가락 사이는 두 손가락이 모여 각이 좁고(<90°), 팔·손목·노이즈로
+        생긴 골은 각이 넓다. 이 각으로 가짜 골을 걸러낸다.
+        """
+        a = math.dist(start, end)
+        b = math.dist(start, far)
+        c = math.dist(end, far)
+        if b == 0 or c == 0:
+            return 180.0
+        cosv = (b * b + c * c - a * a) / (2 * b * c)
+        cosv = max(-1.0, min(1.0, cosv))   # 부동소수 오차로 도메인 벗어남 방지
+        return math.degrees(math.acos(cosv))
 
     @classmethod
     def analyze_opencv(cls, frame):
@@ -163,11 +180,19 @@ class HandRecognizer:
         if defects is None:
             info.update(count=0, reason="no-defects→rock")
             return info
-        # 손가락 사이의 깊은 골(defect) 개수 + 1 ≈ 펴진 손가락 수
+        # 손가락 사이의 골(defect) 중 *깊고 각이 좁은* 것만 센다 → +1 ≈ 손가락 수.
+        # 깊이만 보면 팔·손목·배경이 한 덩어리로 잡힐 때 가짜 골이 과다 계수되어
+        # 가위가 보로 튄다. 각도<임계까지 같이 봐서 진짜 손가락 사이만 남긴다.
         deep = 0
         for i in range(defects.shape[0]):
-            depth = defects[i, 0, 3] / 256.0
-            if depth > cls.OPENCV_DEFECT_DEPTH:
+            s, e, f, d = defects[i, 0]
+            depth = d / 256.0
+            if depth <= cls.OPENCV_DEFECT_DEPTH:
+                continue
+            start = tuple(cnt[s][0])
+            end = tuple(cnt[e][0])
+            far = tuple(cnt[f][0])
+            if cls._defect_angle(start, far, end) <= cls.OPENCV_DEFECT_ANGLE:
                 deep += 1
         info["deep"] = deep
         if deep == 0:          # 골이 전혀 없으면 주먹으로 본다
